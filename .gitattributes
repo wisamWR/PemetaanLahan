@@ -1,0 +1,5 @@
+# Repo disunting di Windows tetapi dibangun di WSL: paksa LF agar Makefile dan skrip tidak rusak.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.tif binary

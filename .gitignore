@@ -1,0 +1,33 @@
+# Citra dan data besar (Sentinel-2) tidak di-commit
+data/
+*.tif
+*.tiff
+*.jp2
+
+# Hasil build
+build/
+*.o
+*.d
+*.a
+*.so
+*.exe
+*.out
+
+# Berkas profil (besar); ringkasannya ditulis di docs/PROFIL_CUDA.md
+*.nsys-rep
+*.ncu-rep
+*.sqlite
+
+# Dokumen internal dan instruksi Claude Code: hanya disimpan lokal, tidak di-push
+docs/
+CLAUDE.md
+
+# Indeks lokal code-review-graph
+.code-review-graph/
+
+# Editor / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
