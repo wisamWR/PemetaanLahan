@@ -57,6 +57,9 @@ int main(int argc, char** argv) {
         }
         const double wall =
             std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+        std::fprintf(stderr, "%s %d: wall=%.3f kmeans=%.3f h2d=%.3f kernel=%.3f d2h=%.3f\n",
+                     r == 0 ? "pemanasan" : "ulang", r, wall, t.kmeans_ms, t.h2d_ms, t.kernel_ms,
+                     t.d2h_ms);
         if (r == 0) continue;
         init.push_back(t.init_ms); km.push_back(t.kmeans_ms); tot.push_back(wall);
         h2d.push_back(t.h2d_ms); ker.push_back(t.kernel_ms); d2h.push_back(t.d2h_ms);

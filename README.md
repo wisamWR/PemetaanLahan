@@ -42,8 +42,12 @@ make clean
 
 Parameter benchmark bisa diganti, contoh `make bench BENCH_W=1000 BENCH_H=1000 BENCH_K=4`.
 
-Status saat ini (T1): `make test` menjalankan uji referensi (lulus), lalu berhenti di tahap
-link `test_cuda_vs_ref` karena `kmeans_cuda` belum dibuat. Itu sesuai rencana; implementasinya di T3.
+Status saat ini (T3): `kmeans_cuda` versi sederhana (akumulasi `atomicAdd` global) menghasilkan
+label dan centroid identik dengan referensi CPU di semua kasus `make test` dan `make test-large`.
+
+Catatan pengukuran: di WSL 2, durasi dari `cudaEvent` (`kmeans_ms`) terukur sekitar 1 sampai 1,5 %
+lebih besar daripada waktu dinding host (`total_ms`) untuk panggilan yang sama. Penyebabnya belum
+diketahui; anggap selisih sebesar itu sebagai batas ketelitian saat membandingkan angka.
 
 ## Struktur folder
 

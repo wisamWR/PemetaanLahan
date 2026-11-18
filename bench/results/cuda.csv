@@ -1,0 +1,2 @@
+mode,image,width,height,k,iters,threads,read_ms,init_ms,kmeans_ms,color_ms,write_ms,total_ms,h2d_ms,kernel_ms,d2h_ms
+cuda,synthetic_random,7680,4320,8,20,0,0,0.002,1454.813,0,0,1450.452,37.284,1353.271,51.167
