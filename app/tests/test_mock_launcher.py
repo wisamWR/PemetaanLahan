@@ -258,6 +258,18 @@ def test_jalan_ulang_ke_folder_yang_sama_menimpa_bersih(launcher, tmp_path):
     assert read_run(out).k == 6 and validate(read_run(out)) == []
 
 
+def test_jalan_ulang_membuang_berkas_opsional_basi(launcher, tmp_path):
+    """labels.u8/verification.json/map.png dari run lama bukan milik run baru: verifikasi dan ekspor
+    penuh akan membacanya sebagai milik run baru bila dibiarkan."""
+    out = tmp_path / "r"
+    launcher.run(make_params(k=4), out)
+    for name in ("labels.u8", "verification.json", "map.png"):
+        (out / name).write_bytes(b"basi")
+    (out / "catatan.txt").write_text("bukan berkas run", encoding="utf-8")
+    launcher.run(make_params(k=4), out)
+    assert {f.name for f in out.iterdir()} == RUN_FILES | {"catatan.txt"}
+
+
 def test_k_berbeda_memberi_k_centroid_dan_counts(launcher, runs_dir):
     for k in (1, 2, 5, 16):
         _, _, run = do_run(launcher, runs_dir, k=k)

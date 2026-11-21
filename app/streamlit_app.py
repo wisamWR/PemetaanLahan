@@ -2,7 +2,7 @@
 
 Langkah 6: layout, state, tombol Jalankan/Bandingkan, kartu perbandingan, dan peta.
 Langkah 7: grafik waktu per tahap. Langkah 8: panel pelabelan dan tabel luas.
-Slot untuk verifikasi (9) sudah disediakan.
+Langkah 9: status verifikasi antarmode.
 
 Skrip ini sengaja tipis: logika ada di `ui/` (murni dan teruji), tampilan di sini.
 `config.BACKEND`, `config.DATA_DIR`, `config.RUNS_DIR` dibaca lewat atribut modul pada
@@ -26,6 +26,7 @@ from ui.compare import MOCK_NOTICE, comparable_runs, render_cards, render_timer
 from ui.labeling_panel import render_labeling_slot
 from ui.maps import KEY_VIEW, VIEW_CLASS, render_maps
 from ui.sidebar import ACTION_COMPARE, Submission, build_pair, build_params, render_sidebar
+from ui.verify_badge import render_verify_slot
 
 TITLE = "Pemetaan Tutupan Lahan"
 SUBTITLE = "K-Means piksel RGB Sentinel-2: CPU, OpenMP, dan CUDA"
@@ -90,13 +91,12 @@ def render_slots(
     class_map: ClassMap | None = None,
 ) -> bool:
     """Slot di bawah peta: grafik waktu (Langkah 7, `cpu`/`opt` = pasangan sebanding), panel
-    pelabelan (Langkah 8, `active` + `class_map` run aktif) lalu tempat Langkah 9. Tanpa run,
-    grafik dan panel tampil sebagai kotak kosong. Mengembalikan True bila panel mengubah
-    nama kelas pada eksekusi ini (`class_map` diubah di tempat)."""
+    pelabelan (Langkah 8, `active` + `class_map` run aktif) lalu status verifikasi (Langkah 9,
+    pasangan yang sama). Tanpa run, tiap slot tampil sebagai kotak kosong. Mengembalikan True
+    bila panel mengubah nama kelas pada eksekusi ini (`class_map` diubah di tempat)."""
     render_stage_slot(cpu, opt)
     changed = render_labeling_slot(active, class_map)
-    with st.container(border=True):
-        st.caption("Status verifikasi antarmode (Langkah 9): belum dibuat")
+    render_verify_slot(cpu, opt)
     return changed
 
 

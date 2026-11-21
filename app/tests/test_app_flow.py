@@ -116,7 +116,8 @@ def test_alur_lengkap_dan_hasil_tidak_hilang_saat_widget_berubah(sandbox):
     assert MOCK_NOTICE in captions(at)                                   # kalimat penuh di bawah peta
     assert any("DATA TIRUAN" in c for c in captions(at) if c != MOCK_NOTICE)    # dan di bawah kartu
     assert len(at.get("image")) == 2                                      # citra asli + peta kelas
-    assert any("belum dibuat" in c for c in captions(at))                # slot Langkah 8-9 masih tersedia
+    assert not any("belum dibuat" in c for c in captions(at))            # semua slot (Langkah 7-9) sudah terisi
+    assert any(s.value.startswith("Status verifikasi antarmode") for s in at.subheader)
     assert (runs / "mock" / CPU_ID / "meta.json").is_file()
 
     # 2. Jalankan Optimalisasi: kartu lengkap dengan speedup

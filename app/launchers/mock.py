@@ -42,6 +42,10 @@ AUTO_CUDA_THRESHOLD_PIXELS = 8_000_000
 SLEEP_ENV = "LC_MOCK_SLEEP"
 
 STAGE_NAMES = ("baca", "inisialisasi", "kmeans", "pewarnaan", "tulis")
+# Berkas opsional yang MockLauncher tidak pernah menulis. Run ulang ke folder yang sama harus
+# menghapusnya: bila tertinggal dari run sebelumnya, berkas itu dibaca sebagai milik run baru
+# (verifikasi resolusi penuh dan ekspor PNG penuh memakai labels.u8 yang basi).
+STALE_FILES = ("labels.u8", "verification.json", "map.png")
 
 # Model biaya (ns per piksel pada satu inti, kecuali dinyatakan lain). Hanya agar pola
 # kasarnya mirip hipotesis I.4 (K-Means CUDA ~20x, total ~5-6x); BUKAN prediksi.
@@ -337,6 +341,9 @@ class MockLauncher:
 
         out_dir = Path(out_dir)
         out_dir.mkdir(parents=True, exist_ok=True)
+        for name in STALE_FILES:
+            if (out_dir / name).is_file():
+                (out_dir / name).unlink()
         _write_atomic(out_dir / "timing.json", _dump(timing))
         _write_atomic(out_dir / "centroids.json", _dump(centroids.tolist()))
         _write_atomic(out_dir / "counts.json", _dump(counts.tolist()))
