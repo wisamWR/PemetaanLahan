@@ -6,6 +6,7 @@ Dataset "kecil" = satu PNG 40x30, sehingga tiap run hanya beberapa puluh milidet
 
 from __future__ import annotations
 
+import json
 import re
 import time
 
@@ -115,7 +116,7 @@ def test_alur_lengkap_dan_hasil_tidak_hilang_saat_widget_berubah(sandbox):
     assert MOCK_NOTICE in captions(at)                                   # kalimat penuh di bawah peta
     assert any("DATA TIRUAN" in c for c in captions(at) if c != MOCK_NOTICE)    # dan di bawah kartu
     assert len(at.get("image")) == 2                                      # citra asli + peta kelas
-    assert any("belum dibuat" in c for c in captions(at))                # slot Langkah 7-9 tersedia
+    assert any("belum dibuat" in c for c in captions(at))                # slot Langkah 8-9 masih tersedia
     assert (runs / "mock" / CPU_ID / "meta.json").is_file()
 
     # 2. Jalankan Optimalisasi: kartu lengkap dengan speedup
@@ -343,3 +344,95 @@ def test_value_error_dari_parameter_tampil_sebagai_pesan(sandbox, monkeypatch):
     press(at, "btn_run")
     assert [e.value for e in at.error] == ["nama dataset tidak aman"]
     assert at.session_state["runs"] == {}
+
+
+# --- grafik waktu per tahap (Langkah 7) ---------------------------------------- #
+
+def charts_of(at: AppTest) -> list[dict]:
+    """Spesifikasi plotly (dict) tiap elemen `plotly_chart`, ditambah kunci widgetnya."""
+    out = []
+    for el in at.get("plotly_chart"):
+        spec = json.loads(el.proto.spec)
+        spec["_key"] = el.key
+        out.append(spec)
+    return out
+
+
+def bars_y(spec: dict) -> list[str]:
+    stage = [t for t in spec["data"] if t.get("meta", {}).get("kind") == "stage"]
+    return list(stage[0]["y"])
+
+
+def total_trace(spec: dict) -> dict:
+    (t,) = [t for t in spec["data"] if t.get("meta", {}).get("kind") == "total"]
+    return t
+
+
+def test_grafik_waktu_tampil_untuk_satu_dan_dua_run_dan_ikut_run_aktif(sandbox):
+    at = start()
+    assert charts_of(at) == []                                            # belum ada hasil: hanya kotak kosong
+    assert any("Grafik waktu per tahap: belum ada hasil" in c for c in captions(at))
+
+    run_mode(at, "cpu")                                                   # satu run
+    no_errors(at)
+    (spec,) = charts_of(at)
+    assert spec["_key"] == "chart_stage_seconds" and bars_y(spec) == ["CPU saja (L0)"]
+    assert "DATA TIRUAN" in spec["layout"]["title"]["text"]               # lencana di dalam grafik
+    assert any(s.value.startswith("Waktu per tahap") and "DATA TIRUAN" in s.value for s in at.subheader)
+    assert not any("Grafik waktu per tahap: belum ada hasil" in c for c in captions(at))
+    cpu_total = float(total_trace(spec)["x"][0])
+    assert cpu_total > 0
+
+    run_mode(at, "opt")                                                   # dua run
+    no_errors(at)
+    (spec,) = charts_of(at)
+    assert bars_y(spec) == ["CPU saja (L0)", "Optimalisasi · OpenMP"]     # dataset kecil: auto memilih OpenMP
+    assert float(total_trace(spec)["x"][0]) == pytest.approx(cpu_total)   # total = timing.json, bukan dihitung ulang
+    assert float(total_trace(spec)["x"][1]) < cpu_total
+    devices = [t["meta"]["device"] for t in spec["data"] if t.get("meta", {}).get("kind") == "legend"]
+    assert devices == ["serial", "omp"]
+
+    # K lain (run CPU baru tanpa pasangan) -> grafik satu bar; memilih run lama -> dua bar lagi
+    at.sidebar.slider(key="f_k").set_value(5)
+    run_mode(at, "cpu")
+    no_errors(at)
+    assert [bars_y(s) for s in charts_of(at)] == [["CPU saja (L0)"]]
+    at.selectbox(key="active_run_pick").select_index(1).run()
+    assert not at.exception
+    assert at.session_state["active_run"] == OPT_ID
+    assert [bars_y(s) for s in charts_of(at)] == [["CPU saja (L0)", "Optimalisasi · OpenMP"]]
+
+
+def test_toggle_persentase_tidak_menghilangkan_hasil(sandbox):
+    at = start()
+    run_mode(at, "cpu")
+    run_mode(at, "opt")
+    shown = metrics(at)
+    assert at.radio(key="chart_view").value == "seconds"
+
+    at.radio(key="chart_view").set_value("percent").run()
+    assert not at.exception
+    (spec,) = charts_of(at)
+    assert spec["_key"] == "chart_stage_percent"
+    assert [float(v) for v in total_trace(spec)["x"]] == [100.0, 100.0]  # sumbu persen: total hanya teks di ujung bar
+    stage = [t for t in spec["data"] if t.get("meta", {}).get("kind") == "stage"]
+    for i in range(2):                                                    # tiap bar berjumlah 100 %
+        assert sum(float(t["x"][i]) for t in stage) == pytest.approx(100.0)
+    assert metrics(at) == shown and len(at.get("image")) == 2             # kartu dan peta tetap
+    assert list(at.session_state["runs"]) == [CPU_ID, OPT_ID]
+
+    at.radio(key="chart_view").set_value("seconds").run()
+    assert not at.exception and charts_of(at)[0]["_key"] == "chart_stage_seconds"
+
+
+def test_tabel_waktu_per_tahap_ada_di_expander(sandbox):
+    at = start()
+    run_mode(at, "cpu")
+    run_mode(at, "opt")
+    assert any(e.label == "Tabel waktu per tahap" for e in at.expander)
+    (frame,) = at.dataframe                                               # kembaran tabel grafik
+    df = frame.value
+    assert list(df["Run"].unique()) == ["CPU saja (L0)", "Optimalisasi · OpenMP"]
+    assert len(df) == 2 * 6                                               # 5 tahap + total resmi per run
+    totals = df[df["Tahap"] == "Total resmi (timing.json)"]["Waktu (s)"].tolist()
+    assert totals[0] > totals[1] > 0                                      # CPU saja lebih lambat dari Optimalisasi

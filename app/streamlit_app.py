@@ -1,7 +1,7 @@
 """Entry point aplikasi Streamlit: pemetaan tutupan lahan (K-Means Sentinel-2).
 
 Langkah 6: layout, state, tombol Jalankan/Bandingkan, kartu perbandingan, dan peta.
-Slot untuk grafik (Langkah 7), pelabelan (8), dan verifikasi (9) sudah disediakan.
+Langkah 7: grafik waktu per tahap. Slot untuk pelabelan (8) dan verifikasi (9) sudah disediakan.
 
 Skrip ini sengaja tipis: logika ada di `ui/` (murni dan teruji), tampilan di sini.
 `config.BACKEND`, `config.DATA_DIR`, `config.RUNS_DIR` dibaca lewat atribut modul pada
@@ -13,12 +13,13 @@ from __future__ import annotations
 import streamlit as st
 
 import config
-from landcover.contract import validate
+from landcover.contract import RunResult, validate
 from landcover.datasets import list_datasets
 from launchers import make_launcher
 from launchers.base import RunParams
 from ui import runs as run_state
 from ui.badges import backend_badge
+from ui.charts import render_stage_slot
 from ui.compare import MOCK_NOTICE, comparable_runs, render_cards, render_timer
 from ui.maps import render_maps
 from ui.sidebar import ACTION_COMPARE, Submission, build_pair, build_params, render_sidebar
@@ -79,10 +80,11 @@ def _on_pick() -> None:
     st.session_state[run_state.ACTIVE_KEY] = st.session_state[KEY_PICK]
 
 
-def render_slots() -> None:
-    """Tempat untuk Langkah 7-9; setiap langkah mengganti isi slotnya."""
+def render_slots(cpu: RunResult | None = None, opt: RunResult | None = None) -> None:
+    """Slot di bawah peta: grafik waktu (Langkah 7, `cpu`/`opt` = pasangan sebanding) lalu tempat
+    Langkah 8-9. Tanpa run, grafik tampil sebagai kotak kosong."""
+    render_stage_slot(cpu, opt)
     for caption in (
-        "Grafik waktu per tahap (Langkah 7)",
         "Pelabelan cluster dan tabel luas (Langkah 8)",
         "Status verifikasi antarmode (Langkah 9)",
     ):
@@ -129,7 +131,7 @@ def render_results(banner) -> None:
 
     class_map = run_state.class_map_for(state, active_id, active.k)
     render_maps(active, class_map, config.DATA_DIR)
-    render_slots()
+    render_slots(cpu, opt)
 
 
 def main() -> None:
