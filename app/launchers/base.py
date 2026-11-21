@@ -27,6 +27,11 @@ _SAFE_NAME = re.compile(r"^\w(?:[\w .-]*\w)?$")
 ProgressCallback = Callable[[str], None]
 
 
+def is_safe_dataset_name(name) -> bool:
+    """Apakah `name` boleh dipakai sebagai nama dataset (dan bagian nama folder run)."""
+    return isinstance(name, str) and _SAFE_NAME.match(name) is not None
+
+
 def _is_int(x) -> bool:
     return isinstance(x, int) and not isinstance(x, bool)
 
@@ -105,5 +110,5 @@ class Launcher(Protocol):
 
 __all__ = [
     "BACKEND_DIRS", "KMEANS_CHOICES", "MODES", "Launcher", "ProgressCallback",
-    "RunParams", "out_dir_for", "run_id",
+    "RunParams", "is_safe_dataset_name", "out_dir_for", "run_id",
 ]

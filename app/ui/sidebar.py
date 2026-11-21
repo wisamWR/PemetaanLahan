@@ -1,0 +1,174 @@
+"""Sidebar: pengunggah citra kecil dan form parameter run (plan Langkah 6, butir 1-2).
+
+Pemisahan: `FormValues`, `build_params`, dan `build_pair` murni (diuji tanpa Streamlit);
+`render_sidebar` hanya menggambar widget dan mengembalikan `Submission` bila salah satu
+tombol ditekan. Semua widget punya `key` tetap (dipakai tes dan menjaga state).
+
+Form (`st.form`) membuat halaman tidak dijalankan ulang tiap slider digeser. Pengunggah
+sengaja di luar form: ia perlu menyimpan berkas lalu memperbarui daftar dataset.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from pathlib import Path
+from typing import MutableMapping
+
+import streamlit as st
+
+from landcover.datasets import DatasetExistsError, DatasetScan, save_upload
+from landcover.reference_kmeans import KMEANS_MAX_K, MAX_SEED
+from launchers.base import KMEANS_CHOICES, MODES, RunParams
+from ui.runs import KMEANS_LABELS, MODE_LABELS
+
+K_MIN, K_DEFAULT = 2, 8
+ITERS_DEFAULT, ITERS_MAX = 20, 1000
+SEED_DEFAULT = 42
+THREADS_MIN, THREADS_MAX, THREADS_DEFAULT = 1, 20, 8
+
+ACTION_RUN = "run"
+ACTION_COMPARE = "compare"
+
+# Kunci widget (tetap, supaya tes dan state stabil).
+KEY_DATASET = "f_dataset"
+KEY_K = "f_k"
+KEY_ITERS = "f_iters"
+KEY_MODE = "f_mode"
+KEY_SEED = "f_seed"
+KEY_KMEANS = "f_kmeans"
+KEY_THREADS = "f_threads"
+KEY_FORCE = "f_force"
+KEY_BTN_RUN = "btn_run"
+KEY_BTN_COMPARE = "btn_compare"
+KEY_UPLOAD = "upl_file"
+KEY_UPLOAD_SAVE = "upl_save"
+UPLOAD_COUNTER = "_upl_counter"
+FLASH = "_flash"
+
+
+@dataclass(frozen=True)
+class FormValues:
+    dataset: str
+    k: int = K_DEFAULT
+    iters: int = ITERS_DEFAULT
+    mode: str = "cpu"                  # "cpu" | "opt"
+    kmeans: str = "auto"               # "auto" | "omp" | "cuda"
+    threads: int = THREADS_DEFAULT
+    seed: int = SEED_DEFAULT
+    force: bool = False                # paksa jalankan ulang (abaikan hasil CPU tersimpan)
+
+
+@dataclass(frozen=True)
+class Submission:
+    action: str                        # ACTION_RUN | ACTION_COMPARE
+    values: FormValues
+
+
+def build_params(values: FormValues, mode: str | None = None) -> RunParams:
+    """`RunParams` dari isian form; `mode` menimpa pilihan mode (untuk Bandingkan).
+
+    ValueError dari `RunParams` (nama dataset tidak aman, K di luar rentang, dst.)
+    dibiarkan naik: pemanggil menampilkannya sebagai pesan."""
+    return RunParams(
+        dataset=values.dataset,
+        mode=values.mode if mode is None else mode,
+        kmeans=values.kmeans,
+        k=values.k,
+        iters=values.iters,
+        seed=values.seed,
+        threads=values.threads,
+    )
+
+
+def build_pair(values: FormValues) -> tuple[RunParams, RunParams]:
+    """(CPU saja, Optimalisasi) dengan parameter lain yang sama, untuk tombol Bandingkan."""
+    return build_params(values, "cpu"), build_params(values, "opt")
+
+
+def _upload_section(data_dir: Path, state: MutableMapping) -> None:
+    n = state.setdefault(UPLOAD_COUNTER, 0)
+    with st.expander("Unggah citra kecil (PNG)"):
+        st.caption("Hanya untuk citra kecil (batas bawaan Streamlit 200 MB). Tile penuh: taruh di data/.")
+        file = st.file_uploader("Berkas PNG", type=["png"], key=f"{KEY_UPLOAD}_{n}")
+        if st.button("Simpan sebagai dataset", key=KEY_UPLOAD_SAVE, disabled=file is None):
+            try:
+                ds = save_upload(data_dir, file.name, file.getvalue())
+            except DatasetExistsError as exc:
+                st.error(str(exc))
+            except (ValueError, OSError) as exc:
+                st.error(f"Unggahan ditolak: {exc}")
+            else:
+                state[KEY_DATASET] = ds.name           # dipilih otomatis; form dibuat sesudah ini
+                state[UPLOAD_COUNTER] = n + 1          # kunci baru = kotak unggah kosong lagi
+                state[FLASH] = f"Dataset '{ds.name}' tersimpan di data/uploads/."
+                st.rerun()
+
+
+def render_sidebar(scan: DatasetScan, data_dir: Path, state: MutableMapping) -> Submission | None:
+    """Gambar sidebar; kembalikan `Submission` bila "Jalankan" atau "Bandingkan" ditekan."""
+    with st.sidebar:
+        st.header("Parameter")
+        _upload_section(Path(data_dir), state)
+        flash = state.pop(FLASH, None)
+        if flash:
+            st.success(flash)
+        if scan.skipped:
+            with st.expander(f"{len(scan.skipped)} berkas dilewati"):
+                for line in scan.skipped:
+                    st.caption(line)
+
+        names = list(scan.names)
+        if state.get(KEY_DATASET) not in names:
+            state.pop(KEY_DATASET, None)               # dataset hilang dari disk: pilih ulang
+        if not names:
+            st.warning(f"Tidak ada dataset di {data_dir} (folder tile dengan manifest.json, atau PNG).")
+        labels = {d.name: d.label for d in scan.datasets}
+
+        with st.form("params"):
+            dataset = st.selectbox(
+                "Dataset", names, key=KEY_DATASET, format_func=lambda n: labels.get(n, n),
+                help="Folder data/<nama>/ dengan manifest.json, atau PNG kecil.",
+            )
+            k = st.slider("Jumlah cluster (K)", K_MIN, KMEANS_MAX_K, K_DEFAULT, key=KEY_K)
+            iters = st.number_input(
+                "Iterasi", min_value=1, max_value=ITERS_MAX, value=ITERS_DEFAULT, step=1, key=KEY_ITERS,
+            )
+            mode = st.radio(
+                "Mode", MODES, key=KEY_MODE, format_func=MODE_LABELS.get,
+                help="Dipakai oleh tombol Jalankan. Bandingkan menjalankan keduanya.",
+            )
+            with st.expander("Lanjutan"):
+                seed = st.number_input(
+                    "Seed inisialisasi", min_value=0, max_value=MAX_SEED, value=SEED_DEFAULT,
+                    step=1, key=KEY_SEED,
+                )
+                kmeans = st.selectbox(
+                    "K-Means (mode Optimalisasi)", KMEANS_CHOICES, key=KEY_KMEANS,
+                    format_func=KMEANS_LABELS.get,
+                )
+                threads = st.slider(
+                    "Thread OpenMP", THREADS_MIN, THREADS_MAX, THREADS_DEFAULT, key=KEY_THREADS,
+                )
+                force = st.checkbox(
+                    "Paksa jalankan ulang", key=KEY_FORCE,
+                    help="Abaikan hasil CPU saja yang tersimpan di runs/ dan hitung ulang.",
+                )
+            disabled = not names
+            run = st.form_submit_button("Jalankan", key=KEY_BTN_RUN, type="primary",
+                                        disabled=disabled, width="stretch")
+            compare = st.form_submit_button("Bandingkan (CPU saja lalu Optimalisasi)",
+                                            key=KEY_BTN_COMPARE, disabled=disabled, width="stretch")
+
+    if not (run or compare) or dataset is None:
+        return None
+    values = FormValues(
+        dataset=dataset, k=int(k), iters=int(iters), mode=mode, kmeans=kmeans,
+        threads=int(threads), seed=int(seed), force=bool(force),
+    )
+    return Submission(ACTION_COMPARE if compare else ACTION_RUN, values)
+
+
+__all__ = [
+    "ACTION_COMPARE", "ACTION_RUN", "FormValues", "Submission", "build_pair", "build_params",
+    "render_sidebar",
+]

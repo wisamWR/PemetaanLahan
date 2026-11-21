@@ -29,6 +29,7 @@ from typing import Callable
 import numpy as np
 from PIL import Image
 
+from landcover.datasets import KIND_PNG, resolve_dataset
 from landcover.reference_kmeans import init_centroids, kmeans_int
 
 from .base import ProgressCallback, RunParams, run_id
@@ -244,6 +245,11 @@ class MockLauncher:
                 pngs = sorted(folder.glob("*.png"))
                 if len(pngs) == 1:
                     image_path = pngs[0]
+        else:
+            # PNG lepas: data/<dataset>.png atau data/uploads/<dataset>.png (Langkah 6).
+            loose = resolve_dataset(self.data_dir, p.dataset)
+            if loose is not None and loose.kind == KIND_PNG:
+                image_path = loose.path
 
         raw_image = None
         if image_path is not None:
