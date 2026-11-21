@@ -430,8 +430,8 @@ def test_tabel_waktu_per_tahap_ada_di_expander(sandbox):
     run_mode(at, "cpu")
     run_mode(at, "opt")
     assert any(e.label == "Tabel waktu per tahap" for e in at.expander)
-    (frame,) = at.dataframe                                               # kembaran tabel grafik
-    df = frame.value
+    (frame,) = [f for f in at.dataframe if "Tahap" in f.value.columns]    # kembaran tabel grafik
+    df = frame.value                                                      # (panel pelabelan punya tabelnya sendiri)
     assert list(df["Run"].unique()) == ["CPU saja (L0)", "Optimalisasi · OpenMP"]
     assert len(df) == 2 * 6                                               # 5 tahap + total resmi per run
     totals = df[df["Tahap"] == "Total resmi (timing.json)"]["Waktu (s)"].tolist()

@@ -112,7 +112,12 @@ def render_maps(
         # Lencana pendek di judul (judul panjang membungkus dan membuat kedua gambar tidak
         # sejajar); kalimat penuh di caption di bawah peta.
         st.subheader(f"{title} {MOCK_BADGE}" if run.mock else title)
-        st.image(class_map_image(run, class_map, view), width="stretch")
+        try:
+            image = class_map_image(run, class_map, view)
+        except ValueError as exc:      # hasil janggal (label atau centroid di luar rentang): jangan mogok
+            st.warning(f"Peta warna kelas tidak bisa dibuat ({exc}); ditampilkan warna centroid.")
+            image = run.map_preview
+        st.image(image, width="stretch")
         if run.mock:
             st.caption(MOCK_NOTICE)
 
