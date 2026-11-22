@@ -279,6 +279,31 @@ def test_auto_mencatat_alasan(core, tmp_path):
     assert m["mode"] == "opt" and m["io_threads"] in (1, 3)
 
 
+def test_pemanasan_cuda_di_luar_total_dan_hanya_untuk_mesin_cuda(core, info, tmp_path):
+    """Kontrak U8: konteks CUDA dipanaskan sebelum pengukuran. Biayanya (ratusan ms) dilaporkan terpisah
+    (`warmup_ms`) dan TIDAK masuk `total_ms`; mesin lain tidak dipanaskan."""
+    src = save(make_image(160, 120, 13), tmp_path / "x.png")
+    cpu_out = tmp_path / "cpu"
+    assert run_core(core, *lc_args(src, cpu_out)).returncode == 0
+    assert json.loads((cpu_out / "timing.json").read_text())["warmup_ms"] == 0
+    assert read_run(cpu_out).meta["cuda_warmup"] is False
+    if not info["engines"]["cuda"]:
+        pytest.skip("cuda tidak terhubung pada build ini")
+
+    out = tmp_path / "cuda"
+    r = run_core(core, *lc_args(src, out, mode="opt", extra=["--kmeans", "cuda"]))
+    assert r.returncode == 0, r.stderr
+    assert "[info] pemanasan kmeans_cuda:" in r.stdout
+    t = json.loads((out / "timing.json").read_text())
+    assert t["warmup_ms"] > 0 and read_run(out).meta["cuda_warmup"] is True
+    parts = sum(t[k] for k in ("read_ms", "init_ms", "kmeans_ms", "color_ms", "write_ms"))
+    # Tanpa pemanasan, total_ms memuat inisialisasi konteks (selisih terhadap jumlah tahap ≈ warmup_ms); dengan
+    # pemanasan selisih hanya overhead pemanggilan (beberapa ms). Jadi selisih harus jauh di bawah warmup_ms.
+    assert t["total_ms"] >= parts - 1e-6
+    assert t["total_ms"] - parts < 0.5 * t["warmup_ms"], (t["total_ms"], parts, t["warmup_ms"])
+    assert validate(read_run(out)) == []
+
+
 @pytest.mark.parametrize("w, h", [(1, 1), (1, 300), (3000, 7)])
 def test_ukuran_tepi_valid_dan_cocok_referensi(core, tmp_path, w, h):
     img = make_image(w, h, w + h)

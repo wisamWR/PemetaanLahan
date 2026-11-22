@@ -24,6 +24,8 @@
 //   total_ms   read + waktu dinding pemanggilan kmeans_* + color + write
 //   aux_ms     (kunci tambahan) counts, pratinjau, dan labels.u8; TIDAK masuk total_ms,
 //              supaya --write-labels tidak mengubah angka benchmark
+//   warmup_ms  (kunci tambahan) pemanasan kmeans_cuda pada citra 64x64 sebelum K-Means diukur
+//              (inisialisasi konteks CUDA, kontrak U8); TIDAK masuk total_ms; 0 untuk mesin lain
 //
 // Tautan: kmeans_cpu, kmeans_omp, kmeans_cuda, dan ref_kmeans dideklarasikan WEAK. Build
 // tanpa salah satunya tetap tertaut; mesinnya dilaporkan tidak tersedia (kode keluar 3
@@ -565,6 +567,50 @@ Engine select_engine(const Options& o, uint64_t n) {
     return e;
 }
 
+// Pemanasan CUDA (kontrak U8, usulan Wisam). Panggilan kmeans_cuda PERTAMA dalam satu proses memicu
+// inisialisasi konteks CUDA (±250 ms di laptop Wisam): waktu itu ikut waktu dinding pemanggilan
+// (jadi ikut total_ms) tetapi bukan kmeans_ms, sehingga mode cuda tampak lebih lambat daripada
+// kerjanya. Satu panggilan pada citra kecil SEBELUM pengukuran K-Means memindahkan biaya itu keluar
+// dari total_ms. Biaya itu tidak disembunyikan: dilaporkan terpisah (timing.json "warmup_ms",
+// meta.json "cuda_warmup") dan TIDAK masuk total_ms. Hanya mesin cuda yang dipanaskan; mesin lain
+// tidak punya biaya satu kali sebesar itu.
+struct Warmup {
+    bool done = false;   // pemanasan dijalankan (mesin cuda)
+    int rc = 0;          // kode kembali kmeans_cuda pada citra pemanasan
+    double ms = 0.0;
+};
+
+Warmup warm_up_engine(const Engine& e) {
+    Warmup w;
+    if (e.device != "cuda" || e.fn == nullptr) return w;
+    constexpr int kSide = 64;
+    std::vector<uint8_t> rgb(static_cast<size_t>(kSide) * kSide * 3);
+    for (int y = 0; y < kSide; ++y)
+        for (int x = 0; x < kSide; ++x) {
+            uint8_t* px = &rgb[(static_cast<size_t>(y) * kSide + x) * 3];
+            px[0] = static_cast<uint8_t>(x * 4);
+            px[1] = static_cast<uint8_t>(y * 4);
+            px[2] = static_cast<uint8_t>((x ^ y) * 4);
+        }
+    std::vector<int32_t> labels(static_cast<size_t>(kSide) * kSide);
+    uint8_t centroids[KMEANS_MAX_K * 3] = {0};
+    KMeansParams kp;
+    std::memset(&kp, 0, sizeof(kp));
+    kp.width = kSide;
+    kp.height = kSide;
+    kp.k = 2;
+    kp.max_iter = 1;
+    kp.seed = 1;
+    kp.num_threads = 1;
+    StageTimes st;
+    std::memset(&st, 0, sizeof(st));
+    const auto t0 = Clock::now();
+    w.rc = e.fn(rgb.data(), labels.data(), centroids, &kp, &st);
+    w.ms = ms_since(t0);
+    w.done = true;
+    return w;
+}
+
 // ---------------------------------------------------------------------------------------
 // Berkas keluaran
 // ---------------------------------------------------------------------------------------
@@ -906,6 +952,13 @@ int run(const Options& o) {
         if (kmeans_init_centroids(rgb.get(), n, o.k, o.seed, init_c) != 0)
             throw std::runtime_error("kmeans_init_centroids gagal (argumen tidak sah)");
 
+        // 3b. Pemanasan CUDA (hanya mesin cuda): di luar semua pengukur waktu tahap, jadi tidak masuk total_ms.
+        const Warmup warm = warm_up_engine(engine);
+        if (warm.done && warm.rc != 0)
+            say("[peringatan] pemanasan kmeans_cuda gagal (kode %d); K-Means tetap dijalankan tanpa pemanasan", warm.rc);
+        else if (warm.done)
+            say("[info] pemanasan kmeans_cuda: %.0f ms (inisialisasi konteks CUDA, tidak dihitung dalam total)", warm.ms);
+
         // 4. K-Means.
         std::unique_ptr<int32_t[]> labels(new int32_t[n]);
         uint8_t centroids[KMEANS_MAX_K * 3] = {0};
@@ -982,7 +1035,7 @@ int run(const Options& o) {
         appendf(timing, "  \"h2d_ms\": %.3f,\n  \"kernel_ms\": %.3f,\n  \"d2h_ms\": %.3f,\n",
                 cuda ? clean_ms(st.h2d_ms) : 0.0, cuda ? clean_ms(st.kernel_ms) : 0.0,
                 cuda ? clean_ms(st.d2h_ms) : 0.0);
-        appendf(timing, "  \"aux_ms\": %.3f,\n", aux_ms);
+        appendf(timing, "  \"aux_ms\": %.3f,\n  \"warmup_ms\": %.3f,\n", aux_ms, warm.done ? clean_ms(warm.ms) : 0.0);
         appendf(timing, "  \"devices\": {\"read\": \"%s\", \"init\": \"serial\", \"kmeans\": \"%s\", \"color\": \"%s\", \"write\": \"serial\"}\n}\n",
                 read_dev, engine.device.c_str(), color_dev);
         write_text_atomic(out / "timing.json", timing);
@@ -1019,6 +1072,7 @@ int run(const Options& o) {
         appendf(meta, "  \"init_centroids\": %s,\n", ic.c_str());
         appendf(meta, "  \"preview_width\": %d,\n  \"preview_height\": %d,\n", pd.w, pd.h);
         appendf(meta, "  \"chunks\": %zu,\n  \"labels_written\": %s,\n", ds.chunks.size(), o.write_labels ? "true" : "false");
+        appendf(meta, "  \"cuda_warmup\": %s,\n", (warm.done && warm.rc == 0) ? "true" : "false");
         if (!ds.source.empty()) appendf(meta, "  \"source\": %s,\n", json_str(ds.source).c_str());
         appendf(meta, "  \"host\": %s,\n  \"created_at\": %s\n}\n", json_str(describe_host()).c_str(),
                 json_str(iso_now()).c_str());
