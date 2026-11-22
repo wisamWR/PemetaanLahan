@@ -238,12 +238,14 @@ def test_run_dengan_tidur_selesai_dan_timer_tidak_merusak_halaman(sandbox, monke
 
 # --- galat dan keadaan tepi ----------------------------------------------------- #
 
-def test_backend_cli_halaman_tampil_dan_jalankan_menampilkan_galat(sandbox, monkeypatch):
+def test_backend_cli_halaman_tampil_dan_jalankan_menampilkan_galat(sandbox, monkeypatch, tmp_path):
     monkeypatch.setattr(config, "BACKEND", "cli")
+    monkeypatch.setattr(config, "CORE_BIN", tmp_path / "tidak_ada" / "landcover")   # biner tidak ada (hermetik)
     at = start()
     assert at.sidebar.selectbox(key="f_dataset").options == ["kecil (PNG)"]     # tanpa dataset sintetis
+    assert any("Program landcover belum bisa dipakai" in w.value for w in at.warning)
     press(at, "btn_run")
-    assert len(at.error) == 1 and "CliLauncher" in at.error[0].value
+    assert len(at.error) == 1 and "Program landcover tidak ditemukan" in at.error[0].value
     assert at.session_state["runs"] == {}
     assert not any("DATA TIRUAN" in m.value for m in at.markdown)
     assert not any("DATA TIRUAN" in w.value for w in at.warning)

@@ -92,8 +92,8 @@ clean:
 # Otomatis ikut tertaut bila ada: src/cpu/*.cpp (kmeans_cpu), src/omp/*.cpp (kmeans_omp),
 # tests/ref_kmeans.cpp (pengganti L0), dan objek CUDA (hanya bila nvcc DAN src/cuda/*.cu ada).
 # Baca/tulis PNG: src/cli/png_io_stb.cpp butuh third_party/stb/stb_image.h dan
-# stb_image_write.h (github.com/nothings/stb, domain publik/MIT). Berkas itu belum ada di
-# repo sampai Ridlo menaruhnya. Ganti implementasi PNG dengan
+# stb_image_write.h (github.com/nothings/stb, domain publik/MIT; sudah ada di third_party/stb/).
+# Ganti implementasi PNG dengan
 #   make landcover LC_PNG_SRC=<berkas.cpp> LC_PNG_CHECK=
 # (antarmuka: src/cli/png_io.h, empat fungsi).
 # Syarat tautan otomatis: src/cpu/*.cpp dan src/omp/*.cpp ditautkan seluruhnya, jadi jangan

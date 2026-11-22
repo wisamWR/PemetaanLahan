@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import MutableMapping
+from typing import TYPE_CHECKING, MutableMapping
 
 import streamlit as st
 
@@ -20,6 +20,9 @@ from landcover.datasets import DatasetExistsError, DatasetScan, save_upload
 from landcover.reference_kmeans import KMEANS_MAX_K, MAX_SEED
 from launchers.base import KMEANS_CHOICES, MODES, RunParams
 from ui.runs import KMEANS_LABELS, MODE_LABELS
+
+if TYPE_CHECKING:
+    from launchers.cli import CoreInfo
 
 K_MIN, K_DEFAULT = 2, 8
 ITERS_DEFAULT, ITERS_MAX = 20, 1000
@@ -104,8 +107,20 @@ def _upload_section(data_dir: Path, state: MutableMapping) -> None:
                 st.rerun()
 
 
-def render_sidebar(scan: DatasetScan, data_dir: Path, state: MutableMapping) -> Submission | None:
-    """Gambar sidebar; kembalikan `Submission` bila "Jalankan" atau "Bandingkan" ditekan."""
+def render_sidebar(
+    scan: DatasetScan,
+    data_dir: Path,
+    state: MutableMapping,
+    engines: "CoreInfo | None" = None,
+) -> Submission | None:
+    """Gambar sidebar; kembalikan `Submission` bila "Jalankan" atau "Bandingkan" ditekan.
+
+    `engines` (hasil `landcover --info`, backend cli): pilihan K-Means yang tidak terhubung pada
+    build itu (OpenMP/CUDA) tidak ditawarkan, dan `engines.notice` ditampilkan di bawah pilihan
+    mode. None = semua pilihan (backend mock)."""
+    kmeans_choices = engines.kmeans_choices if engines is not None else KMEANS_CHOICES
+    if state.get(KEY_KMEANS) not in kmeans_choices:
+        state.pop(KEY_KMEANS, None)                    # pilihan basi (mesin hilang): kembali ke "auto"
     with st.sidebar:
         st.header("Parameter")
         _upload_section(Path(data_dir), state)
@@ -137,13 +152,15 @@ def render_sidebar(scan: DatasetScan, data_dir: Path, state: MutableMapping) -> 
                 "Mode", MODES, key=KEY_MODE, format_func=MODE_LABELS.get,
                 help="Dipakai oleh tombol Jalankan. Bandingkan menjalankan keduanya.",
             )
+            if engines is not None and engines.notice:
+                st.caption(engines.notice)
             with st.expander("Lanjutan"):
                 seed = st.number_input(
                     "Seed inisialisasi", min_value=0, max_value=MAX_SEED, value=SEED_DEFAULT,
                     step=1, key=KEY_SEED,
                 )
                 kmeans = st.selectbox(
-                    "K-Means (mode Optimalisasi)", KMEANS_CHOICES, key=KEY_KMEANS,
+                    "K-Means (mode Optimalisasi)", kmeans_choices, key=KEY_KMEANS,
                     format_func=KMEANS_LABELS.get,
                 )
                 threads = st.slider(

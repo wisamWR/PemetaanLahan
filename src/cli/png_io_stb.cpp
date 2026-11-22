@@ -1,15 +1,16 @@
 // png_io_stb.cpp - implementasi png_io.h dengan stb_image dan stb_image_write.
 //
-// Butuh third_party/stb/stb_image.h dan third_party/stb/stb_image_write.h (github.com/nothings/stb,
-// domain publik/MIT). Berkas itu TIDAK ada di repo: Ridlo yang memutuskan kapan dan dari commit
-// mana menaruhnya (usulan: commit 6b5799bae8a1fe3792691ef4b72ae26434c3e799; stb_image.h
-// 278.442 byte, stb_image_write.h 80.947 byte). Sampai itu, Makefile gagal dengan pesan jelas;
-// logika program bisa diuji dengan backend PNG pengganti (make landcover LC_PNG_SRC=...).
+// Memakai third_party/stb/stb_image.h (v2.34) dan third_party/stb/stb_image_write.h (v1.19)
+// dari github.com/nothings/stb, commit 6b5799bae8a1fe3792691ef4b72ae26434c3e799 (domain
+// publik/MIT; ukuran 278.442 dan 80.947 byte). Logika program juga bisa diuji dengan backend
+// PNG pengganti (make landcover LC_PNG_SRC=...).
 //
-// Catatan kinerja (belum terukur pada tile penuh): stbi_write_png membuat salinan
-// tersaring seluruh citra di memori (±362 MB untuk RGB 10980x10980) lalu memampatkannya
-// dengan deflate sederhana buatan stb. Filter dipaksa tetap (bukan pilihan per baris) supaya
-// tahap "tulis" tidak 5x lebih lambat; ubah LC_PNG_FILTER bila pengukuran menyarankan lain.
+// Catatan kinerja (terukur 22 Nov di WSL, tile 10980x10980 RGB, derau acak = kasus terburuk
+// untuk kompresi): stbi_write_png membuat salinan tersaring seluruh citra di memori (±362 MB)
+// lalu memampatkannya dengan deflate sederhana buatan stb. map.png 8 warna dari tile penuh
+// ±4,4 s dan 25,7 MB; membaca satu PNG 377 MB ±7,1 s serial (16 potongan, 8 thread: ±2,0 s).
+// Filter dipaksa tetap (bukan pilihan per baris) supaya tahap "tulis" tidak 5x lebih lambat;
+// ubah LC_PNG_FILTER bila pengukuran menyarankan lain.
 
 #include "png_io.h"
 

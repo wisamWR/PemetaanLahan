@@ -2,7 +2,8 @@
 
 Langkah 6: layout, state, tombol Jalankan/Bandingkan, kartu perbandingan, dan peta.
 Langkah 7: grafik waktu per tahap. Langkah 8: panel pelabelan dan tabel luas.
-Langkah 9: status verifikasi antarmode.
+Langkah 9: status verifikasi antarmode. Langkah 11: backend `cli` (CliLauncher memanggil program
+`landcover`; mesin yang tidak terhubung pada build itu disembunyikan dari sidebar).
 
 Skrip ini sengaja tipis: logika ada di `ui/` (murni dan teruji), tampilan di sini.
 `config.BACKEND`, `config.DATA_DIR`, `config.RUNS_DIR` dibaca lewat atribut modul pada
@@ -19,6 +20,7 @@ from landcover.datasets import list_datasets
 from landcover.labeling import ClassMap
 from launchers import make_launcher
 from launchers.base import RunParams
+from launchers.cli import CliLauncherError, probe_core
 from ui import runs as run_state
 from ui.badges import backend_badge
 from ui.charts import render_stage_slot
@@ -49,8 +51,8 @@ def perform(submission: Submission, live) -> None:
     """Jalankan run yang diminta (satu, atau CPU lalu Optimalisasi) dan catat hasilnya di state."""
     try:
         steps = _run_steps(submission)
-        launcher = make_launcher(config.BACKEND, config.DATA_DIR)
-    except (ValueError, NotImplementedError) as exc:
+        launcher = make_launcher(config.BACKEND, config.DATA_DIR, config.CORE_BIN)
+    except ValueError as exc:
         live.error(str(exc))
         return
 
@@ -69,6 +71,12 @@ def perform(submission: Submission, live) -> None:
                 on_tick=lambda s, _t=timer, _l=label: render_timer(_t, _l, s),
                 on_progress=on_progress,
             )
+        except CliLauncherError as exc:      # program landcover: ringkasan + stderr/daftar masalah
+            timer.empty()
+            live.error(f"Run '{label}' gagal: {exc.summary}")
+            if exc.detail:
+                live.code(exc.detail, language=None)
+            return
         except Exception as exc:     # batas UI: galat launcher tampil sebagai pesan, bukan crash
             timer.empty()
             live.error(f"Run '{label}' gagal: {type(exc).__name__}: {exc}")
@@ -156,8 +164,17 @@ def main() -> None:
     banner = st.container()      # diisi sesudah run selesai (peringatan DATA TIRUAN)
     live = st.container()        # timer dan progres selama run berjalan
 
+    # Backend cli: tanya program landcover mesin apa yang terhubung (opsi yang tidak ada
+    # disembunyikan di sidebar). Kegagalan tidak membuat halaman mogok; tampil sebagai peringatan.
+    engines = None
+    if config.BACKEND == "cli":
+        probe = probe_core(config.CORE_BIN)
+        engines = probe.info
+        if probe.problem:
+            st.warning(f"Program landcover belum bisa dipakai: {probe.problem}")
+
     scan = list_datasets(config.DATA_DIR, config.BACKEND)
-    submission = render_sidebar(scan, config.DATA_DIR, st.session_state)
+    submission = render_sidebar(scan, config.DATA_DIR, st.session_state, engines=engines)
     if submission is not None:
         perform(submission, live)
     render_results(banner)

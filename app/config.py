@@ -7,6 +7,9 @@ ke root repo, jadi aplikasi jalan dari clone mana pun.
     LC_DATA_DIR  folder dataset      (bawaan: <repo>/data)
     LC_RUNS_DIR  folder hasil run    (bawaan: <repo>/runs)
     LC_CORE_BIN  path program landcover (bawaan: <repo>/build/landcover)
+
+Variabel lain: LC_CORE_TIMEOUT (detik, batas waktu satu run backend cli, bawaan 1800) dibaca
+`launchers/cli.py`; LC_MOCK_SLEEP dibaca `launchers/mock.py`.
 """
 
 from __future__ import annotations
