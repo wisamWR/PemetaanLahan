@@ -5,15 +5,16 @@ tulis), warna = perangkat yang menjalankan tahap itu (CPU serial / OpenMP / CUDA
 perangkat. Tampilan kedua (`as_percent=True`) menormalkan tiap bar ke 100 % supaya pergeseran
 bottleneck terlihat (K-Means dominan di CPU saja, baca/tulis dominan setelah optimalisasi).
 
-`stage_chart`, `stage_table`, `run_labels`, dan `format_duration` murni (teruji tanpa browser).
-`render_stage_chart` / `render_stage_slot` hanya menggambar. Aturan visual mengikuti skill
+Data murni (warna dan nama perangkat, nama tahap, sel tahap, label run, `format_duration`) ada di
+`services/charts.py` (dipakai juga oleh API FastAPI); modul ini mengimpornya, jadi nama-nama lama
+tetap berlaku. Di sini tinggal yang butuh plotly/pandas/Streamlit: `stage_chart`, `stage_table`,
+`is_dark_theme`, `render_stage_chart`, `render_stage_slot`. Aturan visual mengikuti skill
 `dataviz`: warna dipilih menurut tugasnya (identitas perangkat), bar tipis, jarak 2 px antar
 segmen, label di dalam segmen hanya bila muat (sisanya di hover dan tabel), grid hairline.
 """
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass
 from typing import Sequence
 
@@ -22,29 +23,30 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from landcover.contract import STAGES, RunResult
+from services.charts import (
+    DEVICE_COLORS,
+    DEVICE_NAMES,
+    DEVICE_ORDER,
+    STAGE_NAMES,
+    TOTAL_NAME,
+    UNKNOWN_DEVICE_COLOR,
+    StageCell,
+    check_chart_inputs,
+    clean_seconds,
+    clean_seconds_or_none,
+    device_color,
+    device_name,
+    format_duration,
+    run_cells,
+    run_label,
+    run_labels,
+    share_text as _share_text,
+    stage_records,
+)
+from services.compare import MOCK_NOTICE
 from ui.badges import MOCK_BADGE
-from ui.compare import MOCK_NOTICE
-from ui.runs import DEVICE_LABELS, MODE_LABELS
 
-# --- identitas visual (satu sumber; laporan memakai nilai yang sama) -------- #
-
-# Warna dari plan Langkah 7. Divalidasi dengan skill dataviz (validate_palette.js, 21 Nov):
-# lulus pita kecerahan, pemisahan CVD (terburuk dE 11.9 pada --pairs all), lantai penglihatan
-# normal (dE 18.1), dan kontras >= 3:1 pada permukaan terang dan gelap. SATU-SATUNYA yang tidak
-# lulus: lantai kroma abu-abu serial. Itu disengaja: serial = garis dasar tanpa percepatan, jadi
-# harus tampak netral. Identitas tetap terbawa legenda, tulisan di dalam segmen, hover, dan tabel.
-DEVICE_COLORS = {"serial": "#8C8C8C", "omp": "#2F6FDE", "cuda": "#4E9A06"}
-DEVICE_NAMES = DEVICE_LABELS            # objek yang SAMA dengan ui.runs: satu sumber nama perangkat
-UNKNOWN_DEVICE_COLOR = "#B5488A"        # perangkat tak dikenal (hasil janggal tetap tergambar)
-DEVICE_ORDER = tuple(DEVICE_COLORS)     # urutan legenda: serial, omp, cuda
-
-STAGE_NAMES = {
-    "baca": "Baca",
-    "inisialisasi": "Inisialisasi",
-    "kmeans": "K-Means",
-    "pewarnaan": "Pewarnaan",
-    "tulis": "Tulis",
-}
+# --- identitas visual: warna dan nama perangkat ada di services/charts.py (satu sumber) --- #
 
 SEGMENT_TEXT = "#ffffff"        # tulisan di dalam segmen: putih di ketiga warna (APCA |Lc| 67-78)
 
@@ -78,73 +80,8 @@ VIEW_LABELS = {VIEW_SECONDS: "Detik", VIEW_PERCENT: "Persentase per tahap"}
 KEY_VIEW = "chart_view"
 CHART_CONFIG = {"displaylogo": False, "displayModeBar": "hover"}
 
-TOTAL_NAME = "Total resmi (timing.json)"
 
-
-# --- pembantu murni --------------------------------------------------------- #
-
-def format_duration(seconds: float | None) -> str:
-    """Durasi untuk label: milidetik di bawah 1 s ("0.80 ms", "450 ms"), selain itu "12.34 s"."""
-    if seconds is None or not math.isfinite(seconds) or seconds <= 0:
-        return "0 ms"
-    if seconds < 0.01:
-        return f"{seconds * 1000:.2f} ms"
-    if round(seconds * 1000) < 1000:         # 0.9996 s dibulatkan ke "1.00 s", bukan "1000 ms"
-        return f"{seconds * 1000:.0f} ms"
-    return f"{seconds:.2f} s"
-
-
-def _clean(value: object) -> float:
-    """Detik yang aman digambar: NaN, tak hingga, negatif, atau bukan angka -> 0 (lebar nol)."""
-    try:
-        v = float(value)               # type: ignore[arg-type]
-    except (TypeError, ValueError):
-        return 0.0
-    return v if math.isfinite(v) and v > 0 else 0.0
-
-
-def _clean_or_none(value: object) -> float | None:
-    try:
-        v = float(value)               # type: ignore[arg-type]
-    except (TypeError, ValueError):
-        return None
-    return v if math.isfinite(v) and v >= 0 else None
-
-
-def device_color(device: str) -> str:
-    return DEVICE_COLORS.get(device, UNKNOWN_DEVICE_COLOR)
-
-
-def device_name(device: str) -> str:
-    """Nama tampilan; perangkat tak dikenal ditampilkan apa adanya."""
-    return DEVICE_NAMES.get(device, str(device))
-
-
-def _share_text(share: float) -> str:
-    return f"{share:.0f}%" if share >= 10 else f"{share:.1f}%"
-
-
-@dataclass(frozen=True)
-class _Cell:
-    stage: str
-    seconds: float
-    device: str
-    detail: dict[str, float] | None
-    share: float                # persen dari jumlah waktu tahap run ini (0 bila jumlahnya 0)
-
-
-def _run_cells(run: RunResult) -> dict[str, _Cell]:
-    raw = {s: _clean(run.stages[s].time) for s in STAGES}
-    total = sum(raw.values())
-    cells: dict[str, _Cell] = {}
-    for s in STAGES:
-        st_ = run.stages[s]
-        share = raw[s] / total * 100.0 if total > 0 else 0.0
-        cells[s] = _Cell(s, raw[s], str(st_.device), st_.detail, share)
-    return cells
-
-
-def _hover(label: str, cell: _Cell) -> str:
+def _hover(label: str, cell: StageCell) -> str:
     lines = [
         f"<b>{label}</b>",
         f"{STAGE_NAMES[cell.stage]}: {format_duration(cell.seconds)}",
@@ -154,32 +91,8 @@ def _hover(label: str, cell: _Cell) -> str:
     if cell.detail:
         for key in ("h2d", "kernel", "d2h"):
             if key in cell.detail:
-                lines.append(f"{key}: {format_duration(_clean(cell.detail[key]))}")
+                lines.append(f"{key}: {format_duration(clean_seconds(cell.detail[key]))}")
     return "<br>".join(lines)
-
-
-def _check_inputs(runs: Sequence[RunResult], labels: Sequence[str]) -> None:
-    if not runs:
-        raise ValueError("stage_chart butuh minimal satu run")
-    if len(runs) != len(labels):
-        raise ValueError(f"jumlah label ({len(labels)}) harus sama dengan jumlah run ({len(runs)})")
-    if len(set(labels)) != len(labels):
-        # label kembar membuat dua run tertumpuk di satu bar tanpa tanda
-        raise ValueError(f"label run harus unik: {list(labels)}")
-
-
-def run_label(run: RunResult) -> str:
-    """Label pendek satu bar: mode (+ perangkat K-Means untuk Optimalisasi)."""
-    if run.mode == "cpu":
-        return MODE_LABELS["cpu"]
-    mode = MODE_LABELS.get(run.mode, str(run.mode))
-    return f"{mode} · {device_name(run.kmeans_device)}"
-
-
-def run_labels(cpu: RunResult | None, opt: RunResult | None) -> tuple[list[RunResult], list[str]]:
-    """Run yang digambar (CPU saja di atas, lalu Optimalisasi) beserta labelnya; yang None dilewati."""
-    runs = [r for r in (cpu, opt) if r is not None]
-    return runs, [run_label(r) for r in runs]
 
 
 def is_dark_theme() -> bool:
@@ -209,10 +122,10 @@ def stage_chart(
 
     ValueError bila `runs` kosong, jumlah `labels` berbeda, atau ada label kembar."""
     runs, labels = list(runs), list(labels)
-    _check_inputs(runs, labels)
+    check_chart_inputs(runs, labels)
     theme = DARK if dark else LIGHT
-    rows = [_run_cells(r) for r in runs]
-    totals = [_clean_or_none(r.total) for r in runs]
+    rows = [run_cells(r) for r in runs]
+    totals = [clean_seconds_or_none(r.total) for r in runs]
     sums = [sum(c.seconds for c in row.values()) for row in rows]
     mock = any(r.mock for r in runs)
 
@@ -329,22 +242,8 @@ def stage_table(runs: Sequence[RunResult], labels: Sequence[str]) -> pd.DataFram
     """Kembaran tabel grafik (satu baris per run x tahap, plus baris total resmi per run).
 
     Semua nilai grafik terbaca di sini, juga label yang tidak muat di segmen."""
-    runs, labels = list(runs), list(labels)
-    _check_inputs(runs, labels)
-    records: list[dict] = []
-    for run, label in zip(runs, labels):
-        for stage, cell in _run_cells(run).items():
-            records.append({
-                "Run": label, "Tahap": STAGE_NAMES[stage], "Perangkat": device_name(cell.device),
-                "Waktu (s)": cell.seconds, "Persen dari jumlah tahap": cell.share,
-            })
-        total = _clean_or_none(run.total)
-        records.append({
-            "Run": label, "Tahap": TOTAL_NAME, "Perangkat": "",
-            "Waktu (s)": float("nan") if total is None else total,
-            "Persen dari jumlah tahap": float("nan"),
-        })
-    return pd.DataFrame.from_records(records)
+    return pd.DataFrame.from_records(stage_records(runs, labels))
+
 
 
 # --- tampilan Streamlit ------------------------------------------------------ #

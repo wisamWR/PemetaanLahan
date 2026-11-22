@@ -5,8 +5,9 @@ Satu baris editor per cluster: contoh warna centroid, id, piksel, persen, kolom 
 disimpan di `session_state["class_maps"][run_id]` (`ui.runs.class_map_for`); tabel luas
 (`area_table`), peta warna kelas, dan unduhan semuanya dibaca dari peta kelas itu.
 
-Logika murni (tanpa Streamlit) ada di bagian atas modul dan diuji tanpa browser;
-`render_labeling_panel` hanya menggambar.
+Logika murni (nama kelas, ringkasan, CSV, PNG, nama berkas) ada di `services/labeling_panel.py`
+(dipakai juga oleh API FastAPI) dan diuji tanpa browser; modul ini mengimpornya, jadi nama-nama
+lama tetap berlaku. `render_labeling_panel` hanya menggambar.
 
 Aturan yang tidak boleh diubah diam-diam:
 
@@ -28,223 +29,51 @@ Aturan yang tidak boleh diubah diam-diam:
 
 from __future__ import annotations
 
-import base64
-import io
-import math
-from dataclasses import dataclass
-from functools import lru_cache
-from pathlib import Path
-
-import numpy as np
-import pandas as pd
 import streamlit as st
-from PIL import Image
 
 from landcover.contract import RunResult
-from landcover.export import png_bytes, table_csv_bytes
 from landcover.labeling import (
-    CLASS_PRESETS, TOTAL_LABEL, UNNAMED, ClassMap, _normalized_class_map, area_table,
-    cluster_table, normalize_class_name,
+    CLASS_PRESETS, ClassMap, _normalized_class_map, area_table, normalize_class_name,
 )
-from landcover.render import class_palette, export_full_res_png, recolor
+from services.compare import MOCK_NOTICE
+from services.labeling_panel import (
+    COL_CLASS,
+    COL_CLUSTER,
+    COL_COLOR,
+    COL_OTHER,
+    COL_PERCENT,
+    COL_PIXELS,
+    DEFAULT_PIXEL_SIZE_M,
+    EDITOR_COLUMNS,
+    KEY_EDITOR_PREFIX,
+    LABELS_FILE,
+    MOCK_FILE_PREFIX,
+    READ_ONLY_COLUMNS,
+    SWATCH_SIZE,
+    Summary,
+    area_csv,
+    class_map_from_frame,
+    class_map_png,
+    cluster_csv,
+    editor_frame,
+    editor_key,
+    export_full_map,
+    export_names,
+    format_ha,
+    format_percent,
+    labels_file_of,
+    pixel_size_of,
+    resolve_name,
+    split_name,
+    summary_of,
+    swatch_data_url,
+)
+from services.runs import run_id_of
 from ui.badges import MOCK_BADGE
-from ui.compare import MOCK_NOTICE
-from ui.runs import run_id_of
 
-KEY_EDITOR_PREFIX = "label_editor__"
-LABELS_FILE = "labels.u8"                 # keluaran `landcover --write-labels` (Langkah 11a)
-DEFAULT_PIXEL_SIZE_M = 10.0
-MOCK_FILE_PREFIX = "TIRUAN_"
-
-COL_COLOR = "Warna"
-COL_CLUSTER = "Cluster"
-COL_PIXELS = "Piksel"
-COL_PERCENT = "Persen (%)"
-COL_CLASS = "Kelas"
-COL_OTHER = "Nama lain"
-EDITOR_COLUMNS = (COL_COLOR, COL_CLUSTER, COL_PIXELS, COL_PERCENT, COL_CLASS, COL_OTHER)
-READ_ONLY_COLUMNS = (COL_COLOR, COL_CLUSTER, COL_PIXELS, COL_PERCENT)
-
-SWATCH_SIZE = (40, 20)
 ROW_PX = 35                                # tinggi baris bawaan tabel Streamlit
 TABLE_PAD_PX = 3
 
-
-# --------------------------------------------------------------------------- #
-# Logika murni
-# --------------------------------------------------------------------------- #
-
-def editor_key(run_id: str) -> str:
-    return f"{KEY_EDITOR_PREFIX}{run_id}"
-
-
-def pixel_size_of(run: RunResult) -> tuple[float, str | None]:
-    """(ukuran piksel m, catatan). `pixel_size_m` tidak wajib di meta.json (kontrak); bila
-    tidak ada atau tidak masuk akal, dipakai 10 m dan alasannya dikembalikan sebagai catatan."""
-    raw = run.meta.get("pixel_size_m")
-    if raw is None:
-        return DEFAULT_PIXEL_SIZE_M, f"meta.json tidak mencatat pixel_size_m; luas dihitung dengan {DEFAULT_PIXEL_SIZE_M:g} m."
-    if isinstance(raw, bool) or not isinstance(raw, (int, float)) or not math.isfinite(raw) or raw <= 0:
-        return DEFAULT_PIXEL_SIZE_M, f"pixel_size_m di meta.json tidak valid ({raw!r}); luas dihitung dengan {DEFAULT_PIXEL_SIZE_M:g} m."
-    return float(raw), None
-
-
-@lru_cache(maxsize=512)
-def swatch_data_url(rgb: tuple[int, int, int]) -> str:
-    """PNG kecil satu warna sebagai data URL, untuk `ImageColumn`. Nilai di luar 0..255 dipotong
-    (hanya untuk tampilan; `contract.validate()` yang memperingatkan centroid janggal)."""
-    color = tuple(min(255, max(0, int(c))) for c in rgb)
-    buffer = io.BytesIO()
-    Image.new("RGB", SWATCH_SIZE, color).save(buffer, format="PNG")
-    return "data:image/png;base64," + base64.b64encode(buffer.getvalue()).decode("ascii")
-
-
-def split_name(name: str) -> tuple[str | None, str]:
-    """Nama kelas -> (isi kolom Kelas atau None, isi kolom Nama lain)."""
-    name = normalize_class_name(name)
-    if name == UNNAMED:
-        return None, ""
-    if name in CLASS_PRESETS:
-        return name, ""
-    return None, name
-
-
-def _blank(value) -> bool:
-    return value is None or value is pd.NA or (isinstance(value, float) and math.isnan(value)) or (
-        isinstance(value, str) and not value.strip()
-    )
-
-
-def resolve_name(kelas, nama_lain) -> str:
-    """Nama akhir satu cluster dari dua kolom editor (Nama lain mengalahkan Kelas).
-
-    `ValueError` untuk nama yang ditolak `normalize_class_name` (`Total`, tipe bukan teks)."""
-    if not _blank(nama_lain):
-        return normalize_class_name(nama_lain)
-    return normalize_class_name(None if _blank(kelas) else kelas)
-
-
-def editor_frame(counts, centroids, class_map: ClassMap, pixel_size_m: float = DEFAULT_PIXEL_SIZE_M) -> pd.DataFrame:
-    """Isi awal editor: satu baris per cluster, kolom `EDITOR_COLUMNS`, dtype stabil."""
-    table = cluster_table(counts, centroids, pixel_size_m)
-    names = _normalized_class_map(class_map, len(table))
-    split = [split_name(names[i]) for i in range(len(table))]
-    return pd.DataFrame(
-        {
-            COL_COLOR: [swatch_data_url((int(r), int(g), int(b))) for r, g, b in zip(table["r"], table["g"], table["b"])],
-            COL_CLUSTER: table["cluster"].to_numpy(dtype=np.int64),
-            COL_PIXELS: table["piksel"].to_numpy(dtype=np.int64),
-            COL_PERCENT: table["persen"].to_numpy(dtype=np.float64),
-            COL_CLASS: pd.Series([kelas for kelas, _ in split], dtype="string"),
-            COL_OTHER: pd.Series([other for _, other in split], dtype="string"),
-        },
-        columns=list(EDITOR_COLUMNS),
-    )
-
-
-def class_map_from_frame(frame: pd.DataFrame, previous: ClassMap, k: int) -> tuple[ClassMap, list[str]]:
-    """Peta kelas baru dari tabel editor: (peta, daftar galat).
-
-    Cluster dipetakan lewat kolom `Cluster` (bukan posisi baris). Nama yang ditolak
-    mempertahankan nama sebelumnya dan masuk ke daftar galat; fungsi ini tidak memanggil
-    `st.*`. `previous` tidak diubah. `ValueError` bila kolom wajib hilang atau id cluster di
-    luar 0..k-1 (itu kesalahan program, bukan isian pengguna)."""
-    missing = [c for c in (COL_CLUSTER, COL_CLASS, COL_OTHER) if c not in frame.columns]
-    if missing:
-        raise ValueError(f"kolom editor hilang: {', '.join(missing)}")
-    result = _normalized_class_map(previous, k)
-    errors: list[str] = []
-    for cluster, kelas, other in zip(frame[COL_CLUSTER], frame[COL_CLASS], frame[COL_OTHER]):
-        idx = int(cluster)
-        if not 0 <= idx < k:
-            raise ValueError(f"id cluster {idx} di luar rentang 0..{k - 1}")
-        try:
-            result[idx] = resolve_name(kelas, other)
-        except ValueError as exc:
-            errors.append(f"Cluster {idx}: {exc}. Nama sebelumnya ({result[idx]}) dipertahankan.")
-    return result, errors
-
-
-@dataclass(frozen=True)
-class Summary:
-    total_ha: float
-    named_classes: int            # kelas berbeda yang sudah diberi nama
-    largest: tuple[str, float] | None      # (nama, persen) kelas bernama terbesar; None bila belum ada
-    unnamed_percent: float        # persen piksel pada cluster yang belum diberi nama
-
-
-def summary_of(area: pd.DataFrame) -> Summary:
-    """Ringkasan dari `area_table` (baris `Total` dan `UNNAMED` diperlakukan khusus)."""
-    body = area[area["kelas"] != TOTAL_LABEL]
-    named = body[body["kelas"] != UNNAMED]
-    unnamed = body[body["kelas"] == UNNAMED]
-    total_ha = float(area.loc[area["kelas"] == TOTAL_LABEL, "luas_ha"].iloc[0])
-    largest = None
-    if len(named):
-        top = named.loc[named["piksel"].idxmax()]
-        largest = (str(top["kelas"]), float(top["persen"]))
-    return Summary(
-        total_ha=total_ha,
-        named_classes=len(named),
-        largest=largest,
-        unnamed_percent=float(unnamed["persen"].sum()) if len(unnamed) else 0.0,
-    )
-
-
-def format_ha(value: float) -> str:
-    return f"{value:,.2f} ha"
-
-
-def format_percent(value: float) -> str:
-    return f"{value:.2f} %"
-
-
-def export_names(run_id: str, mock: bool) -> dict[str, str]:
-    """Nama berkas unduhan. Hasil tiruan diberi awalan `TIRUAN_` (lihat docstring modul)."""
-    prefix = MOCK_FILE_PREFIX if mock else ""
-    return {
-        "map": f"{prefix}peta-kelas_{run_id}.png",
-        "area": f"{prefix}luas-per-kelas_{run_id}.csv",
-        "clusters": f"{prefix}per-cluster_{run_id}.csv",
-        "full": f"{prefix}peta-kelas-penuh_{run_id}.png",
-    }
-
-
-def class_map_png(run: RunResult, class_map: ClassMap) -> bytes:
-    """PNG pratinjau peta kelas (warna kelas; cluster tanpa nama memakai warna centroid)."""
-    return png_bytes(recolor(run.labels_preview, class_palette(class_map, run.centroids)))
-
-
-def area_csv(run: RunResult, class_map: ClassMap) -> bytes:
-    return table_csv_bytes(area_table(run.counts, class_map, pixel_size_of(run)[0]))
-
-
-def cluster_csv(run: RunResult) -> bytes:
-    return table_csv_bytes(cluster_table(run.counts, run.centroids, pixel_size_of(run)[0]))
-
-
-def labels_file_of(run: RunResult) -> Path | None:
-    path = run.path / LABELS_FILE
-    return path if path.is_file() else None
-
-
-def export_full_map(run: RunResult, class_map: ClassMap, out_path: Path | str | None = None) -> Path:
-    """Tulis PNG berpalet resolusi penuh dari `labels.u8` ke folder run (atau `out_path`).
-
-    Memakai `run.width`/`run.height` dari meta (bukan ukuran pratinjau). `FileNotFoundError`
-    bila `labels.u8` tidak ada; `ValueError` dari `export_full_res_png` bila ukuran berkas atau
-    label tidak cocok (tidak ada yang ditulis). Penulisan atomik."""
-    source = labels_file_of(run)
-    if source is None:
-        raise FileNotFoundError(f"{run.path / LABELS_FILE} tidak ada (dibuat oleh landcover --write-labels)")
-    target = Path(out_path) if out_path is not None else run.path / export_names(run_id_of(run), run.mock)["full"]
-    export_full_res_png(source, run.width, run.height, class_palette(class_map, run.centroids), target)
-    return target
-
-
-# --------------------------------------------------------------------------- #
-# Tampilan
-# --------------------------------------------------------------------------- #
 
 def _table_height(rows: int) -> int:
     return ROW_PX * (rows + 1) + TABLE_PAD_PX

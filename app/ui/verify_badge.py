@@ -1,70 +1,47 @@
 """Lencana status verifikasi antarmode (plan Langkah 9; logika di `landcover/verify.py`).
 
-Fungsi teks (`verdict_text`, `verdict_style`, `source_text`, `detail_rows`, `format_*`) murni dan
-diuji tanpa browser. `render_verify_slot` hanya menggambar.
+Kalimat vonis, sumber, dan rincian (`verdict_text`, `source_text`, `detail_rows`, `format_*`) murni
+dan ada di `services/verification.py` (dipakai juga oleh API FastAPI); modul ini mengimpornya, jadi
+nama-nama lama tetap berlaku. Di sini tinggal yang khusus Streamlit: `escape_markdown`,
+`verdict_style` (tingkat vonis -> warna teks Streamlit), cache, dan `render_*`.
 
-Aturan kata (jangan dilonggarkan):
-  * "Label identik 100 % (N piksel), centroid sama" HANYA untuk sumber yang menjangkau label resolusi
-    penuh (`labels.u8` atau `verification.json`). Hasil dari pratinjau selalu berkata "Verifikasi
-    parsial" dan hanya menyebut jumlah piksel pratinjau.
-  * Persen identik dipotong ke bawah (bukan dibulatkan): satu piksel berbeda dari 120 juta tidak
-    boleh tampil "100.00 %".
-  * Vonis "Berbeda" bukan galat aplikasi: ditampilkan sebagai teks berwarna dengan ikon dan kata,
-    bukan `st.error` (yang dipakai untuk kegagalan aplikasi).
-  * Format angka mengikuti aplikasi (ribuan koma, desimal titik, mis. 120,560,400 dan 99.98 %),
-    bukan tanda baca Indonesia yang dicontohkan di plan.
+Aturan kata (jangan dilonggarkan) ada di docstring `services/verification.py`. Vonis "Berbeda"
+bukan galat aplikasi: ditampilkan sebagai teks berwarna dengan ikon dan kata, bukan `st.error`.
 """
 
 from __future__ import annotations
 
 import re
-from decimal import ROUND_DOWN, Decimal
 
 import streamlit as st
 
 from landcover.contract import RunResult
-from landcover.verify import (
-    DIFF_CENTROIDS,
-    DIFF_COUNTS,
-    DIFF_LABELS,
-    SOURCE_FILE,
-    SOURCE_LABELS,
-    SOURCE_PREVIEW,
-    STATUS_DIFFERENT,
-    STATUS_IDENTICAL,
-    STATUS_NOT_COMPARABLE,
-    VERIFICATION_FILE,
-    Verification,
-    verification_stamp,
-    verify_pair,
+from landcover.verify import Verification, verification_stamp, verify_pair
+from services.verification import (
+    ICON_BAD,
+    ICON_OK,
+    ICON_PARTIAL,
+    ICON_WARN,
+    LEVEL_BAD,
+    LEVEL_ICONS,
+    LEVEL_OK,
+    LEVEL_PARTIAL,
+    LEVEL_WARN,
+    MOCK_VERIFY_NOTICE,
+    TITLE,
+    detail_rows,
+    format_identical_pct,
+    format_pixels,
+    params_text as _params_text,
+    source_text,
+    verdict_level,
+    verdict_text,
 )
 from ui.badges import MOCK_BADGE
 from ui.charts import run_label
 from ui.runs import MODE_LABELS
 
-TITLE = "Status verifikasi antarmode"
-MOCK_VERIFY_NOTICE = (
-    "DATA TIRUAN: hasil verifikasi ini tidak membuktikan apa pun tentang core C++/OpenMP/CUDA."
-)
-
-ICON_OK, ICON_PARTIAL, ICON_BAD, ICON_WARN = "✅", "ℹ️", "❌", "⚠️"
-
-
-# --- pemformatan ---------------------------------------------------------------- #
-
-def format_pixels(n: int) -> str:
-    """Jumlah piksel dengan pemisah ribuan koma (mis. 120,560,400)."""
-    return f"{int(n):,}"
-
-
-def format_identical_pct(pct: float) -> str:
-    """Persen identik DIPOTONG ke bawah dengan dua desimal ("99.98"); tepat 100 jadi "100".
-
-    Memotong menjamin nilai di bawah 100 tidak pernah tampil sebagai "100.00"."""
-    if pct >= 100:
-        return "100"
-    return f"{Decimal(repr(float(pct))).quantize(Decimal('0.01'), rounding=ROUND_DOWN):f}"
-
+_LEVEL_COLORS = {LEVEL_OK: "green", LEVEL_PARTIAL: "blue", LEVEL_BAD: "red", LEVEL_WARN: "orange"}
 
 _MD_SPECIAL = re.compile(r"([\\`*_\[\]$~])")
 
@@ -74,91 +51,11 @@ def escape_markdown(text: str) -> str:
     return _MD_SPECIAL.sub(r"\\\1", text)
 
 
-# --- teks vonis ----------------------------------------------------------------- #
-
-def _label_scope(v: Verification) -> str:
-    return "label" if v.full else "label pratinjau"
-
-
-def _label_difference_text(v: Verification) -> str:
-    text = f"{format_identical_pct(v.identical_pct)} % {_label_scope(v)} identik"
-    if v.n_diff is not None and v.n_compared:
-        text += f" ({format_pixels(v.n_diff)} dari {format_pixels(v.n_compared)} piksel berbeda)"
-    return text
-
-
-def verdict_text(v: Verification) -> str:
-    """Kalimat vonis (tanpa ikon)."""
-    if v.status == STATUS_NOT_COMPARABLE:
-        return "Tidak sebanding: " + "; ".join(v.reasons)
-    if v.status == STATUS_IDENTICAL:
-        if v.full:
-            return f"Label identik 100 % ({format_pixels(v.n_compared)} piksel), centroid sama"
-        if v.n_compared:
-            return (
-                f"Verifikasi parsial: label pratinjau ({format_pixels(v.n_compared)} piksel pratinjau), "
-                "counts, dan centroid sama. Label resolusi penuh belum dibandingkan"
-            )
-        return (
-            "Verifikasi parsial: counts dan centroid sama. Label pratinjau tidak dibandingkan "
-            "dan label resolusi penuh belum dibandingkan"
-        )
-    parts: list[str] = []
-    if DIFF_LABELS in v.differences:
-        parts.append(_label_difference_text(v))
-    elif v.identical_pct is not None:
-        parts.append(f"{_label_scope(v)} identik")
-    if DIFF_CENTROIDS in v.differences:
-        parts.append("centroid berbeda")
-    if DIFF_COUNTS in v.differences:
-        parts.append("counts berbeda")
-    return "Berbeda: " + "; ".join(parts)
-
-
 def verdict_style(v: Verification) -> tuple[str, str]:
     """(ikon, warna teks Streamlit) untuk vonis: hijau hanya untuk identik di resolusi penuh."""
-    if v.status == STATUS_DIFFERENT:
-        return ICON_BAD, "red"
-    if v.status == STATUS_NOT_COMPARABLE:
-        return ICON_WARN, "orange"
-    return (ICON_OK, "green") if v.full else (ICON_PARTIAL, "blue")
+    level = verdict_level(v)
+    return LEVEL_ICONS[level], _LEVEL_COLORS[level]
 
-
-def source_text(v: Verification) -> str | None:
-    """Keterangan sumber; None bila tidak ada (tidak sebanding)."""
-    if v.source == SOURCE_FILE:
-        return f"Sumber: {VERIFICATION_FILE} (modul verifikasi)."
-    if v.source == SOURCE_LABELS:
-        return "Sumber: labels.u8 kedua run, resolusi penuh (dibandingkan per blok)."
-    if v.source == SOURCE_PREVIEW:
-        return (
-            "Sumber: pratinjau (labels_preview.png, counts.json, centroids.json). Label resolusi "
-            "penuh dibandingkan bila kedua run punya labels.u8 (landcover --write-labels) atau "
-            f"salah satu punya {VERIFICATION_FILE}."
-        )
-    return None
-
-
-def _yes_no(flag: bool | None, yes: str = "sama", no: str = "berbeda") -> str:
-    return "tidak dibandingkan" if flag is None else (yes if flag else no)
-
-
-def detail_rows(v: Verification) -> list[tuple[str, str]]:
-    """Baris (pemeriksaan, hasil) untuk tabel rincian; kosong bila tidak sebanding."""
-    if v.status == STATUS_NOT_COMPARABLE:
-        return []
-    if v.identical_pct is None:
-        labels = "tidak dibandingkan"
-    elif DIFF_LABELS in v.differences:
-        labels = _label_difference_text(v)
-    else:
-        labels = f"identik ({format_pixels(v.n_compared)} piksel)"
-    return [
-        (_label_scope(v).capitalize(), labels),
-        ("Centroid", _yes_no(v.centroids_equal)),
-        ("Counts", _yes_no(v.counts_equal)),
-        ("Sumber", v.source or "-"),
-    ]
 
 
 # --- cache ---------------------------------------------------------------------- #
@@ -175,13 +72,7 @@ def verify_cached(ref: RunResult, run: RunResult) -> Verification:
     `labels.u8` 120 MB di tiap suntingan akan merusak respons panel (Langkah 8: < 1 detik)."""
     return _verify_cached(ref, run, verification_stamp(ref), verification_stamp(run))
 
-
 # --- tampilan ------------------------------------------------------------------- #
-
-def _params_text(run: RunResult) -> str:
-    m = run.meta
-    return f"{m.get('dataset', '?')} · K={run.k} · {m.get('iters', '?')} iterasi · seed {m.get('seed', '?')}"
-
 
 def render_verification(cpu: RunResult, opt: RunResult) -> None:
     """Vonis, sumber, catatan, dan rincian untuk pasangan (CPU saja, Optimalisasi)."""

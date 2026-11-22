@@ -1,8 +1,9 @@
 """Sidebar: pengunggah citra kecil dan form parameter run (plan Langkah 6, butir 1-2).
 
-Pemisahan: `FormValues`, `build_params`, dan `build_pair` murni (diuji tanpa Streamlit);
-`render_sidebar` hanya menggambar widget dan mengembalikan `Submission` bila salah satu
-tombol ditekan. Semua widget punya `key` tetap (dipakai tes dan menjaga state).
+Pemisahan: `FormValues`, `build_params`, dan `build_pair` murni dan ada di `services/params.py`
+(dipakai juga oleh API FastAPI); modul ini mengimpornya, jadi nama-nama lama tetap berlaku.
+`render_sidebar` hanya menggambar widget dan mengembalikan `Submission` bila salah satu tombol
+ditekan. Semua widget punya `key` tetap (dipakai tes dan menjaga state).
 
 Form (`st.form`) membuat halaman tidak dijalankan ulang tiap slider digeser. Pengunggah
 sengaja di luar form: ia perlu menyimpan berkas lalu memperbarui daftar dataset.
@@ -18,16 +19,24 @@ import streamlit as st
 
 from landcover.datasets import DatasetExistsError, DatasetScan, save_upload
 from landcover.reference_kmeans import KMEANS_MAX_K, MAX_SEED
-from launchers.base import KMEANS_CHOICES, MODES, RunParams
+from launchers.base import KMEANS_CHOICES, MODES
+from services.params import (
+    ITERS_DEFAULT,
+    ITERS_MAX,
+    K_DEFAULT,
+    K_MIN,
+    SEED_DEFAULT,
+    THREADS_DEFAULT,
+    THREADS_MAX,
+    THREADS_MIN,
+    FormValues,
+    build_pair,
+    build_params,
+)
 from ui.runs import KMEANS_LABELS, MODE_LABELS
 
 if TYPE_CHECKING:
     from launchers.cli import CoreInfo
-
-K_MIN, K_DEFAULT = 2, 8
-ITERS_DEFAULT, ITERS_MAX = 20, 1000
-SEED_DEFAULT = 42
-THREADS_MIN, THREADS_MAX, THREADS_DEFAULT = 1, 20, 8
 
 ACTION_RUN = "run"
 ACTION_COMPARE = "compare"
@@ -50,42 +59,9 @@ FLASH = "_flash"
 
 
 @dataclass(frozen=True)
-class FormValues:
-    dataset: str
-    k: int = K_DEFAULT
-    iters: int = ITERS_DEFAULT
-    mode: str = "cpu"                  # "cpu" | "opt"
-    kmeans: str = "auto"               # "auto" | "omp" | "cuda"
-    threads: int = THREADS_DEFAULT
-    seed: int = SEED_DEFAULT
-    force: bool = False                # paksa jalankan ulang (abaikan hasil CPU tersimpan)
-
-
-@dataclass(frozen=True)
 class Submission:
     action: str                        # ACTION_RUN | ACTION_COMPARE
     values: FormValues
-
-
-def build_params(values: FormValues, mode: str | None = None) -> RunParams:
-    """`RunParams` dari isian form; `mode` menimpa pilihan mode (untuk Bandingkan).
-
-    ValueError dari `RunParams` (nama dataset tidak aman, K di luar rentang, dst.)
-    dibiarkan naik: pemanggil menampilkannya sebagai pesan."""
-    return RunParams(
-        dataset=values.dataset,
-        mode=values.mode if mode is None else mode,
-        kmeans=values.kmeans,
-        k=values.k,
-        iters=values.iters,
-        seed=values.seed,
-        threads=values.threads,
-    )
-
-
-def build_pair(values: FormValues) -> tuple[RunParams, RunParams]:
-    """(CPU saja, Optimalisasi) dengan parameter lain yang sama, untuk tombol Bandingkan."""
-    return build_params(values, "cpu"), build_params(values, "opt")
 
 
 def _upload_section(data_dir: Path, state: MutableMapping) -> None:
