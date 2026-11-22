@@ -14,6 +14,7 @@ diuji bila `--info` melaporkannya terhubung.
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 from pathlib import Path
@@ -135,6 +136,26 @@ def test_mesin_eksplisit_yang_tidak_terhubung_kode_3_dengan_stderr_asli(core, da
     e = ei.value
     assert e.exit_code == 3 and "tidak terhubung" in e.summary and "tidak terhubung pada build ini" in e.detail
     assert not (out_dir_for(runs, "cli", params) / "meta.json").exists()
+
+
+def test_cuda_eksplisit_perangkat_cuda_dan_identik_dengan_cpu(core, data, runs, info):
+    """`auto` pada 2048x2048 (< ambang 8 juta piksel) tidak memilih cuda, jadi cuda dipilih eksplisit."""
+    if not info.cuda:
+        pytest.skip("cuda tidak terhubung pada build ini")
+    by_mode = {}
+    for params in (P(mode="cpu"), P(mode="opt", kmeans="cuda")):
+        out = out_dir_for(runs, "cli", params)
+        assert launcher(data, core).run(params, out) == out
+        by_mode[params.mode] = read_run(out)
+    cpu, opt = by_mode["cpu"], by_mode["opt"]
+    assert validate(opt) == []
+    assert opt.meta["kmeans_device"] == "cuda" and opt.meta["kmeans_impl"] == "kmeans_cuda"
+    timing = json.loads((opt.path / "timing.json").read_text(encoding="utf-8"))
+    assert timing["h2d_ms"] > 0 and timing["kernel_ms"] > 0 and timing["d2h_ms"] > 0
+    assert np.array_equal(cpu.centroids, opt.centroids) and np.array_equal(cpu.counts, opt.counts)
+    assert (cpu.path / "labels.u8").read_bytes() == (opt.path / "labels.u8").read_bytes()
+    v = verify_pair(cpu, opt)
+    assert v.status == STATUS_IDENTICAL and v.source in FULL_SOURCES
 
 
 def test_png_rusak_kode_1_dan_folder_tidak_valid(core, data, runs):
