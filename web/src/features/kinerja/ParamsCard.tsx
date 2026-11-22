@@ -1,4 +1,4 @@
-import { ChevronDown, GitCompareArrows, Play } from 'lucide-react'
+import { ChevronDown, GitCompareArrows, LoaderCircle, Play } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
@@ -36,12 +36,15 @@ export function RunActions({
   config,
   mode,
   disabled,
+  busy = false,
   onRun,
   onCompare,
 }: {
   config: Config
   mode: Mode
   disabled: boolean
+  /** Ada run yang sedang berjalan: tombol utama menampilkan "Berjalan…" dengan pemutar, bukan sekadar redup. */
+  busy?: boolean
   onRun: () => void
   onCompare: () => void
 }) {
@@ -49,11 +52,17 @@ export function RunActions({
     <>
       <Button variant="outline" disabled={disabled} onClick={onRun}>
         <Play />
-        Jalankan {config.labels.modes[mode]}
+        Jalankan<span className="hidden sm:inline"> {config.labels.modes[mode]}</span>
       </Button>
-      <Button disabled={disabled} onClick={onCompare}>
-        <GitCompareArrows />
-        Bandingkan (CPU saja lalu Optimalisasi)
+      <Button disabled={disabled} onClick={onCompare} aria-busy={busy || undefined}>
+        {busy ? <LoaderCircle className="animate-spin" /> : <GitCompareArrows />}
+        {busy ? (
+          'Berjalan…'
+        ) : (
+          <>
+            Bandingkan<span className="hidden sm:inline"> (CPU saja lalu Optimalisasi)</span>
+          </>
+        )}
       </Button>
     </>
   )

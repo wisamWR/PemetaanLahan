@@ -45,6 +45,10 @@ from services.labeling_panel import (
     COL_PIXELS,
     DEFAULT_PIXEL_SIZE_M,
     EDITOR_COLUMNS,
+    EXPORT_LABELS,
+    HELP_CLASS,
+    HELP_OTHER,
+    HELP_PANEL,
     KEY_EDITOR_PREFIX,
     LABELS_FILE,
     MOCK_FILE_PREFIX,
@@ -87,14 +91,9 @@ def _editor_config() -> dict:
         COL_PIXELS: cfg.NumberColumn("Piksel", format="%d"),
         COL_PERCENT: cfg.NumberColumn("Persen (%)", format="%.2f"),
         COL_CLASS: cfg.SelectboxColumn(
-            "Kelas", options=list(CLASS_PRESETS), required=False,
-            help="Cluster ber-Kelas sama digabung di tabel luas dan berwarna sama di peta.",
+            "Kelas", options=list(CLASS_PRESETS), required=False, help=HELP_CLASS,
         ),
-        COL_OTHER: cfg.TextColumn(
-            "Nama lain", max_chars=40,
-            help="Nama bebas, mis. Sawah. Bila diisi, mengalahkan kolom Kelas; kosongkan agar "
-                 "pilihan Kelas dipakai. Huruf besar/kecil dibedakan. Nama 'Total' tidak boleh dipakai.",
-        ),
+        COL_OTHER: cfg.TextColumn("Nama lain", max_chars=40, help=HELP_OTHER),
     }
 
 
@@ -119,15 +118,15 @@ def _render_downloads(run: RunResult, class_map: ClassMap) -> None:
         left.caption(f"Peta kelas (PNG) tidak bisa dibuat: {exc}")
     if map_png is not None:
         left.download_button(
-            "Peta kelas (PNG pratinjau)", data=map_png, file_name=names["map"],
+            EXPORT_LABELS["map"], data=map_png, file_name=names["map"],
             mime="image/png", key="dl_map", on_click="ignore", width="stretch",
         )
     middle.download_button(
-        "Tabel luas per kelas (CSV)", data=area_csv(run, class_map), file_name=names["area"],
+        EXPORT_LABELS["area"], data=area_csv(run, class_map), file_name=names["area"],
         mime="text/csv", key="dl_area_csv", on_click="ignore", width="stretch",
     )
     right.download_button(
-        "Tabel per cluster (CSV)", data=cluster_csv(run), file_name=names["clusters"],
+        EXPORT_LABELS["clusters"], data=cluster_csv(run), file_name=names["clusters"],
         mime="text/csv", key="dl_cluster_csv", on_click="ignore", width="stretch",
     )
     if run.mock:
@@ -165,10 +164,7 @@ def render_labeling_panel(run: RunResult, class_map: ClassMap) -> bool:
     size, size_note = pixel_size_of(run)
 
     st.subheader(f"Pelabelan cluster dan luas {MOCK_BADGE}" if run.mock else "Pelabelan cluster dan luas")
-    st.caption(
-        "Beri nama tiap cluster: pilih Kelas atau ketik Nama lain. Cluster bernama sama digabung, "
-        "dan peta langsung memakai warna kelas."
-    )
+    st.caption(HELP_PANEL)
     if size_note:
         st.caption(size_note)
 

@@ -1,13 +1,24 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Gauge, Layers, Map as MapIcon } from 'lucide-react'
+import { Gauge, Layers, LoaderCircle, Map as MapIcon } from 'lucide-react'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { KinerjaPage } from '@/features/kinerja/KinerjaPage'
-import { PemetaanPage } from '@/features/pemetaan/PemetaanPage'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
+
+// Halaman dimuat terpisah (code-splitting): Recharts (halaman Kinerja) tidak ikut unduhan awal halaman Pemetaan.
+const KinerjaPage = lazy(() => import('@/features/kinerja/KinerjaPage').then((m) => ({ default: m.KinerjaPage })))
+const PemetaanPage = lazy(() => import('@/features/pemetaan/PemetaanPage').then((m) => ({ default: m.PemetaanPage })))
+
+function PageFallback() {
+  return (
+    <div className="flex items-center justify-center gap-2 py-24 text-sm text-muted-foreground" role="status">
+      <LoaderCircle className="size-4 animate-spin" aria-hidden />
+      Memuat halaman…
+    </div>
+  )
+}
 
 type Page = 'kinerja' | 'pemetaan'
 
@@ -116,8 +127,9 @@ export default function App() {
           </div>
         </header>
 
-        <main className="mx-auto w-full max-w-[1280px] px-4 py-6 md:px-8 md:py-8">
-          {page === 'kinerja' ? <KinerjaPage /> : <PemetaanPage />}
+        {/* pb-28 (layar sempit): ruang untuk bilah aksi tetap di dasar layar (lihat PageHeader). */}
+        <main className="mx-auto w-full max-w-[1280px] px-4 pt-6 pb-28 md:px-8 md:py-8">
+          <Suspense fallback={<PageFallback />}>{page === 'kinerja' ? <KinerjaPage /> : <PemetaanPage />}</Suspense>
         </main>
       </div>
     </div>

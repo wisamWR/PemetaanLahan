@@ -1,10 +1,13 @@
-import { TriangleAlert } from 'lucide-react'
+import { useState } from 'react'
+import { ChevronDown, TriangleAlert } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { AreaResponse } from '@/lib/api'
 import type { ClusterEntry, Rows } from '@/lib/labelStore'
+import { useMediaQuery } from '@/lib/useMediaQuery'
 import { cn } from '@/lib/utils'
 
 const NONE = '__none__'          // Radix Select tidak menerima nilai kosong untuk item
@@ -16,12 +19,37 @@ interface Props {
   onChange: (cluster: number, patch: Partial<ClusterEntry>) => void
 }
 
+const WIDE = '(min-width: 768px)'
+
+/** Legenda ringkas untuk layar sempit: swatch, nama akhir, dan persen per cluster (pola legenda ios Shell dan Alan). */
+function CompactLegend({ area }: { area: AreaResponse }) {
+  return (
+    <ul className="flex flex-col divide-y" aria-label="Legenda ringkas" data-testid="legend-compact">
+      {area.clusters.map((c) => (
+        <li key={c.cluster} className="flex items-center gap-2.5 py-2 first:pt-0 last:pb-0" data-testid={`legend-compact-${c.cluster}`}>
+          <span className="size-4 shrink-0 rounded-md ring-1 ring-foreground/15" style={{ background: c.class_hex }} aria-hidden />
+          <span className={cn('min-w-0 flex-1 truncate text-sm', c.name === area.unnamed_label && 'text-muted-foreground')}>
+            {c.name}
+          </span>
+          <span className="shrink-0 text-xs text-muted-foreground tabular-nums">{c.percent_text}</span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 /**
  * Panel pelabelan sebagai legenda (Felt, Fresha, Midday): satu baris per cluster dengan swatch warna
  * peta, id cluster, persen, lalu Kelas (pilihan) dan Nama lain (teks bebas). Aturan "Nama lain
  * mengalahkan Kelas" dan penolakan nama `Total` diputuskan server; baris ini hanya menampilkan hasilnya.
+ *
+ * Di layar sempit (< md) editor dilipat: yang tampak legenda ringkas satu baris per cluster dengan tombol
+ * "Ubah nama kelas" (K=8 menghabiskan ±1.000 px bila semua editor terbuka). Dari md ke atas editor selalu terbuka.
  */
 export function LegendCard({ area, rows, onChange }: Props) {
+  const wide = useMediaQuery(WIDE)
+  const [open, setOpen] = useState(false)
+  const expanded = wide || open
   return (
     <Card data-testid="legend-card" className="min-w-0">
       <CardHeader>
@@ -29,7 +57,26 @@ export function LegendCard({ area, rows, onChange }: Props) {
         <CardDescription className="text-[13px]">{area.help.panel}</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
-        <ul className="-mx-1 flex max-h-[46rem] flex-col divide-y overflow-y-auto px-1" aria-label="Cluster">
+        {!wide && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="self-start"
+            aria-expanded={expanded}
+            aria-controls="legend-editor"
+            onClick={() => setOpen((v) => !v)}
+          >
+            <ChevronDown className={cn('transition-transform', open && 'rotate-180')} />
+            {open ? 'Sembunyikan editor' : 'Ubah nama kelas'}
+          </Button>
+        )}
+        {!expanded && <CompactLegend area={area} />}
+        <ul
+          id="legend-editor"
+          hidden={!expanded}
+          className="-mx-1 flex max-h-[46rem] flex-col divide-y overflow-y-auto px-1"
+          aria-label="Cluster"
+        >
           {area.clusters.map((c) => {
             const entry = rows[c.cluster] ?? BLANK
             const conflict = entry.kelas !== null && entry.nama_lain.trim() !== ''

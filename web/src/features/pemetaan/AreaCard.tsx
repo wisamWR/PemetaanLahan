@@ -1,5 +1,7 @@
+import { useRef } from 'react'
 import { ChevronDown, Download, FileSpreadsheet, ImageIcon, Map as MapIcon } from 'lucide-react'
 import { MockBadge } from '@/components/MockBadge'
+import { useToast } from '@/components/Toaster'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -11,6 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { urls, type AreaResponse, type AreaRow, type ExportItem, type ExportKind } from '@/lib/api'
+import { downloadFile } from '@/lib/download'
 import { cn } from '@/lib/utils'
 
 const EXPORT_ICONS: Record<ExportKind, typeof Download> = {
@@ -20,7 +23,7 @@ const EXPORT_ICONS: Record<ExportKind, typeof Download> = {
   full: ImageIcon,
 }
 
-function ExportEntry({ item, href }: { item: ExportItem; href: string }) {
+function ExportEntry({ item, href, onPrepare }: { item: ExportItem; href: string; onPrepare?: () => void }) {
   const Icon = EXPORT_ICONS[item.kind]
   const body = (
     <>
@@ -44,6 +47,14 @@ function ExportEntry({ item, href }: { item: ExportItem; href: string }) {
       </DropdownMenuItem>
     )
   }
+  if (onPrepare) {
+    // Berkas yang butuh disiapkan server dulu: tidak lewat tautan, supaya penyiapannya diberi umpan balik (toast).
+    return (
+      <DropdownMenuItem data-testid={`export-${item.kind}`} onSelect={onPrepare}>
+        {body}
+      </DropdownMenuItem>
+    )
+  }
   return (
     <DropdownMenuItem asChild data-testid={`export-${item.kind}`}>
       <a href={href} download={item.filename}>
@@ -53,8 +64,40 @@ function ExportEntry({ item, href }: { item: ExportItem; href: string }) {
   )
 }
 
-/** Tombol "Ekspor" outline di kanan header kartu (HubSpot, Kajabi) membuka menu unduhan (Sketch, Adobe Express). */
+/**
+ * Tombol "Ekspor" outline di kanan header kartu (HubSpot, Kajabi) membuka menu unduhan (Sketch, Adobe Express).
+ * PNG resolusi penuh dibuat server dari `labels.u8` (±3 detik untuk tile 10980²), jadi diunduh lewat fetch dengan toast
+ * "menyiapkan" lalu "siap" atau galatnya (pola kartu progres Obvious, Bonsai, Optimal Workshop); ekspor kecil tetap tautan.
+ */
 function ExportMenu({ area }: { area: AreaResponse }) {
+  const toast = useToast()
+  const preparing = useRef(false)
+
+  const downloadFull = async (item: ExportItem, href: string) => {
+    if (preparing.current) {
+      toast.show({ kind: 'info', title: 'PNG resolusi penuh masih disiapkan', description: 'Tunggu sampai selesai sebelum meminta lagi.' })
+      return
+    }
+    preparing.current = true
+    const id = toast.show({
+      kind: 'loading',
+      title: 'Menyiapkan PNG resolusi penuh…',
+      description: 'Citra besar butuh beberapa detik. Unduhan dimulai otomatis.',
+    })
+    try {
+      const name = await downloadFile(href, item.filename)
+      toast.update(id, { kind: 'success', title: 'PNG resolusi penuh siap', description: name })
+    } catch (e) {
+      toast.update(id, {
+        kind: 'error',
+        title: 'PNG resolusi penuh gagal dibuat',
+        description: e instanceof Error ? e.message : String(e),
+      })
+    } finally {
+      preparing.current = false
+    }
+  }
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -66,9 +109,17 @@ function ExportMenu({ area }: { area: AreaResponse }) {
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-80">
         <DropdownMenuLabel>Unduh hasil pemetaan</DropdownMenuLabel>
-        {area.exports.map((item) => (
-          <ExportEntry key={item.kind} item={item} href={urls.runExport(area.run_id, item.kind, area.names)} />
-        ))}
+        {area.exports.map((item) => {
+          const href = urls.runExport(area.run_id, item.kind, area.names)
+          return (
+            <ExportEntry
+              key={item.kind}
+              item={item}
+              href={href}
+              onPrepare={item.kind === 'full' ? () => void downloadFull(item, href) : undefined}
+            />
+          )
+        })}
         {area.export_note && <DropdownMenuLabel className="pt-2">{area.export_note}</DropdownMenuLabel>}
       </DropdownMenuContent>
     </DropdownMenu>

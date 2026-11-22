@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { TriangleAlert } from 'lucide-react'
 import { ApiErrorState } from '@/components/ApiErrorState'
 import { PageHeader } from '@/components/PageHeader'
+import { useToast } from '@/components/Toaster'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
@@ -96,12 +97,14 @@ function EmptyState({
   config,
   mode,
   disabled,
+  busy,
   onRun,
   onCompare,
 }: {
   config: Config
   mode: Mode
   disabled: boolean
+  busy: boolean
   onRun: () => void
   onCompare: () => void
 }) {
@@ -114,8 +117,9 @@ function EmptyState({
           Pilih dataset, lalu tekan <b>Bandingkan</b> untuk menjalankan CPU saja dan Optimalisasi. Kartu speedup, grafik waktu
           per tahap, dan status verifikasi muncul di sini setelah kedua run selesai.
         </p>
-        <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
-          <RunActions config={config} mode={mode} disabled={disabled} onRun={onRun} onCompare={onCompare} />
+        {/* Di layar sempit tombol yang sama sudah ada di bilah tetap di dasar layar (PageHeader). */}
+        <div className="mt-2 flex flex-wrap items-center justify-center gap-2 max-md:hidden">
+          <RunActions config={config} mode={mode} disabled={disabled} busy={busy} onRun={onRun} onCompare={onCompare} />
         </div>
       </CardContent>
     </Card>
@@ -124,6 +128,7 @@ function EmptyState({
 
 export function KinerjaPage() {
   const qc = useQueryClient()
+  const toast = useToast()
   const config = useQuery({ queryKey: ['config'], queryFn: api.config })
   const datasets = useQuery({ queryKey: ['datasets'], queryFn: api.datasets })
   const runs = useQuery({ queryKey: ['runs'], queryFn: api.runs })
@@ -166,8 +171,14 @@ export function KinerjaPage() {
       const opt = done.find((s) => s.mode === 'opt')
       if (cpu || opt) setSelection({ cpu: cpu?.run_id, opt: opt?.run_id })
       setVersion((v) => v + 1)
+      // Toast supaya hasil terlihat walau halaman sedang tergulir jauh dari panel progres (rinciannya tetap di panel).
+      if (job.status === 'done') {
+        toast.show({ kind: 'success', title: job.kind === 'compare' ? 'Perbandingan selesai' : 'Run selesai', description: done.map((s) => s.label).join(' dan ') })
+      } else {
+        toast.show({ kind: 'error', title: 'Run berhenti karena galat', description: job.error?.message })
+      }
     },
-    [qc],
+    [qc, toast],
   )
   const onLost = useCallback(() => setJobId(null), [])
   const { job, tick } = useJob(jobId, onFinished, onLost)
@@ -235,7 +246,8 @@ export function KinerjaPage() {
   const cfg = config.data
   const data = compare.data
   const problems = [...(data?.cpu?.problems ?? []), ...(data?.opt?.problems ?? [])]
-  const runDisabled = running || start.isPending || datasets.data.datasets.length === 0
+  const busy = running || start.isPending
+  const runDisabled = busy || datasets.data.datasets.length === 0
   const onRun = () => start.mutate('run')
   const onCompare = () => start.mutate('compare')
 
@@ -244,7 +256,9 @@ export function KinerjaPage() {
       <PageHeader
         title="Kinerja"
         description={PAGE_DESCRIPTION}
-        actions={<RunActions config={cfg} mode={form.mode} disabled={runDisabled} onRun={onRun} onCompare={onCompare} />}
+        actions={
+          <RunActions config={cfg} mode={form.mode} disabled={runDisabled} busy={busy} onRun={onRun} onCompare={onCompare} />
+        }
       />
 
       <ParamsCard
@@ -301,7 +315,7 @@ export function KinerjaPage() {
       )}
 
       {data?.empty ? (
-        <EmptyState config={cfg} mode={form.mode} disabled={runDisabled} onRun={onRun} onCompare={onCompare} />
+        <EmptyState config={cfg} mode={form.mode} disabled={runDisabled} busy={busy} onRun={onRun} onCompare={onCompare} />
       ) : data ? (
         <section className="flex flex-col gap-4" aria-label="Hasil">
           <div className="flex flex-wrap items-center justify-between gap-3">

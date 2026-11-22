@@ -138,3 +138,19 @@
     letter-spacing: -0.015em;
     }
 }
+/* Bilah progres tak tentu (toast "loading"): segmen bergerak dari kiri ke kanan. */
+@keyframes lc-indeterminate {
+  0% {
+    transform: translateX(-110%);
+  }
+  100% {
+    transform: translateX(260%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [style*='lc-indeterminate'] {
+    animation: none !important;
+    transform: none !important;
+  }
+}

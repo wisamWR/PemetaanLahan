@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Map as MapIcon, TriangleAlert } from 'lucide-react'
+import { LoaderCircle, Map as MapIcon, TriangleAlert } from 'lucide-react'
 import { ApiErrorState } from '@/components/ApiErrorState'
 import { PageHeader } from '@/components/PageHeader'
+import { useToast } from '@/components/Toaster'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
@@ -66,15 +67,27 @@ function EmptyIllustration() {
   )
 }
 
+/** Tiga langkah pemakaian (pola daftar "Mulai" Eventbrite dan Slite): angka bulat, judul, keterangan redup. */
+const QUICK_START = [
+  { title: 'Pilih citra', hint: 'Kartu bergambar di atas, atau unggah PNG sendiri.' },
+  { title: 'Atur jumlah cluster (K), lalu Buat peta', hint: 'K-Means dijalankan dengan mode Optimalisasi; progresnya tampil di bawah.' },
+  { title: 'Beri nama cluster, lihat luas, ekspor', hint: 'Legenda sekaligus editor nama kelas; tabel luas dalam persen dan hektare.' },
+]
+
 function EmptyState({
   dataset,
   k,
   disabled,
+  busy,
+  firstUse,
   onMake,
 }: {
   dataset: string
   k: number
   disabled: boolean
+  busy: boolean
+  /** Belum ada satu pun hasil di disk: tampilkan langkah mulai cepat (pengenalan ringan, hilang sendiri setelah run pertama). */
+  firstUse: boolean
   onMake: () => void
 }) {
   return (
@@ -94,26 +107,43 @@ function EmptyState({
             'Unggah citra PNG, atau taruh folder tile (dengan manifest.json) atau PNG di data/, lalu muat ulang halaman.'
           )}
         </p>
-        <Button className="mt-1" disabled={disabled} onClick={onMake}>
-          <MapIcon />
-          Buat peta
+        {firstUse && dataset && (
+          <ol className="mt-1 flex w-full max-w-md flex-col gap-3 text-left" data-testid="quick-start" aria-label="Mulai cepat">
+            {QUICK_START.map((step, i) => (
+              <li key={step.title} className="flex items-start gap-3">
+                <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border text-xs font-medium tabular-nums text-muted-foreground">
+                  {i + 1}
+                </span>
+                <span className="flex flex-col gap-0.5">
+                  <span className="text-sm font-medium">{step.title}</span>
+                  <span className="text-xs text-muted-foreground">{step.hint}</span>
+                </span>
+              </li>
+            ))}
+          </ol>
+        )}
+        {/* Di layar sempit tombol yang sama sudah ada di bilah tetap di dasar layar (PageHeader). */}
+        <Button className="mt-1 max-md:hidden" disabled={disabled} onClick={onMake}>
+          {busy ? <LoaderCircle className="animate-spin" /> : <MapIcon />}
+          {busy ? 'Membuat peta…' : 'Buat peta'}
         </Button>
       </CardContent>
     </Card>
   )
 }
 
-function MakeMapButton({ disabled, onMake }: { disabled: boolean; onMake: () => void }) {
+function MakeMapButton({ disabled, busy, onMake }: { disabled: boolean; busy: boolean; onMake: () => void }) {
   return (
-    <Button disabled={disabled} onClick={onMake} data-testid="make-map">
-      <MapIcon />
-      Buat peta
+    <Button disabled={disabled} onClick={onMake} data-testid="make-map" aria-busy={busy || undefined}>
+      {busy ? <LoaderCircle className="animate-spin" /> : <MapIcon />}
+      {busy ? 'Membuat peta…' : 'Buat peta'}
     </Button>
   )
 }
 
 export function PemetaanPage() {
   const qc = useQueryClient()
+  const toast = useToast()
   const config = useQuery({ queryKey: ['config'], queryFn: api.config })
   const datasets = useQuery({ queryKey: ['datasets'], queryFn: api.datasets })
   const runs = useQuery({ queryKey: ['runs'], queryFn: api.runs })
@@ -145,8 +175,14 @@ export function PemetaanPage() {
       for (const key of ['runs', 'compare', 'verify', 'config']) qc.invalidateQueries({ queryKey: [key] })
       const done = job.steps.find((s) => s.status === 'done')
       if (done && dataset !== null && k !== null) setPin({ dataset, k, runId: done.run_id })
+      // Toast supaya selesainya terlihat walau layar tergulir ke tempat lain (rincian galat tetap di panel progres).
+      if (job.status === 'done') {
+        toast.show({ kind: 'success', title: 'Peta selesai dibuat', description: dataset !== null && k !== null ? `${dataset}, K=${k}` : undefined })
+      } else {
+        toast.show({ kind: 'error', title: 'Peta gagal dibuat', description: job.error?.message })
+      }
     },
-    [qc, dataset, k],
+    [qc, dataset, k, toast],
   )
   const onLost = useCallback(() => setJobId(null), [])
   const { job, tick } = useJob(jobId, onFinished, onLost)
@@ -209,7 +245,8 @@ export function PemetaanPage() {
   const cfg = config.data
   const cards = datasets.data.datasets
   const selected = dataset ?? ''
-  const runDisabled = running || start.isPending || upload.isPending || selected === ''
+  const busy = running || start.isPending
+  const runDisabled = busy || upload.isPending || selected === ''
   const onMake = () => start.mutate()
 
   const pinned = pin && pin.dataset === selected && pin.k === k ? pin.runId : null
@@ -220,7 +257,7 @@ export function PemetaanPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="Pemetaan" description={PAGE_DESCRIPTION} actions={<MakeMapButton disabled={runDisabled} onMake={onMake} />} />
+      <PageHeader title="Pemetaan" description={PAGE_DESCRIPTION} actions={<MakeMapButton disabled={runDisabled} busy={busy} onMake={onMake} />} />
 
       <ImagePicker
         config={cfg}
@@ -230,8 +267,14 @@ export function PemetaanPage() {
         k={k}
         uploading={upload.isPending}
         uploadError={uploadError}
-        onDataset={setDataset}
-        onK={setK}
+        onDataset={(name) => {
+          setDataset(name)
+          if (!running) setJobId(null)       // panel progres run sebelumnya (selesai atau galat) tidak relevan untuk citra baru
+        }}
+        onK={(value) => {
+          setK(value)
+          if (!running) setJobId(null)
+        }}
         onUpload={(file) => upload.mutate(file)}
       />
 
@@ -269,7 +312,7 @@ export function PemetaanPage() {
       ) : run ? (
         <ResultView key={run.run_id} run={run} />
       ) : (
-        <EmptyState dataset={selected} k={k} disabled={runDisabled} onMake={onMake} />
+        <EmptyState dataset={selected} k={k} disabled={runDisabled} busy={busy} firstUse={runs.data.runs.length === 0} onMake={onMake} />
       )}
     </div>
   )

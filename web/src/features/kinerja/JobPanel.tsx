@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { CircleCheck, CircleX, Clock, LoaderCircle, SkipForward, X } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -31,11 +32,19 @@ function stepText(step: JobStep, tick: Tick | null): string {
   return 'menunggu'
 }
 
-/** Progres pekerjaan. Waktu berjalan hanya penanda progres; angka kinerja dari timing.json. */
+/**
+ * Progres pekerjaan. Waktu berjalan hanya penanda progres; angka kinerja dari timing.json.
+ * Saat pekerjaan baru muncul, panel digulirkan ke dalam pandangan (hanya bila belum terlihat penuh) supaya progres
+ * tidak tersembunyi di bawah lipatan layar, terutama di ponsel dan jendela pendek.
+ */
 export function JobPanel({ job, tick, onDismiss }: { job: JobSnapshot; tick: Tick | null; onDismiss: () => void }) {
   const running = job.status === 'running' || job.status === 'queued'
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    ref.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  }, [job.id])
   return (
-    <div className="flex flex-col gap-3" data-testid="job-panel" data-status={job.status}>
+    <div ref={ref} className="flex scroll-mb-24 flex-col gap-3" data-testid="job-panel" data-status={job.status}>
       <Card>
         <CardContent className="flex flex-col gap-3">
           <div className="flex items-center justify-between gap-3">

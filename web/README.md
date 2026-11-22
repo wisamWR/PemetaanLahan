@@ -1,7 +1,7 @@
 # UI web (Vite + React + TypeScript)
 
 Frontend aplikasi Pemetaan Tutupan Lahan. Backend: FastAPI di `app/api/` (rute `/api/*`).
-Fase 1 dan 2 selesai. Halaman **Kinerja**: Bandingkan CPU saja vs Optimalisasi, kartu speedup, grafik waktu per
+Fase 1, 2, dan 3 selesai. Halaman **Kinerja**: Bandingkan CPU saja vs Optimalisasi, kartu speedup, grafik waktu per
 tahap, status verifikasi. Halaman **Pemetaan**: kartu citra (bergambar) dan unggah PNG, parameter K, "Buat peta"
 (mode Optimalisasi), citra asli | peta kelas (slider sebelum/sesudah atau berdampingan), legenda yang sekaligus
 editor nama kelas (Kelas dan Nama lain; Nama lain mengalahkan Kelas), tabel luas (persen dan hektare), dan menu
@@ -13,6 +13,16 @@ Recharts, TanStack Query. Teks antarmuka bahasa Indonesia; angka dan kalimat von
 (`app/services/`), frontend hanya menampilkan.
 
 ## Menjalankan (dari root repo, Windows)
+
+Satu perintah (bangun frontend bila perlu, lalu API + web di http://127.0.0.1:8000):
+
+```powershell
+app\tools\run_web.cmd                       # backend tiruan (DATA TIRUAN)
+app\tools\run_web.cmd --backend cli --open  # program landcover asli lewat WSL
+```
+
+Opsi dan cara memasang program `landcover` di WSL: `app/tools/README.md`. Paket npm dipasang sekali dengan
+`npm --prefix web install`.
 
 Mode pengembangan (dua terminal):
 

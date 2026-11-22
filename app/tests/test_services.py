@@ -113,3 +113,15 @@ def test_verdict_level_dan_gaya_streamlit_konsisten():
         v = make(status, full)
         assert sv.verdict_level(v) == level
         assert verdict_style(v) == (sv.LEVEL_ICONS[level], color)
+
+
+def test_kalimat_bantuan_dan_label_ekspor_hanya_satu_sumber():
+    """`ui/labeling_panel.py` (Streamlit) mengimpor kalimat bantuan dan label ekspor dari `services`, tidak menyalin ganda."""
+    import ui.labeling_panel as ui_panel
+    from services import labeling_panel as svc_panel
+
+    for name in ("HELP_PANEL", "HELP_OTHER", "HELP_CLASS", "EXPORT_LABELS"):
+        assert getattr(ui_panel, name) is getattr(svc_panel, name), name
+    # kalimat yang dulu tertulis ganda di ui/ memang masih sama dengan yang dipakai API
+    assert svc_panel.EXPORT_LABELS["map"] == "Peta kelas (PNG pratinjau)"
+    assert svc_panel.HELP_PANEL.startswith("Beri nama tiap cluster")

@@ -169,7 +169,8 @@ export function ResultView({ run }: { run: RunSummary }) {
           />
         ))}
       </KpiStrip>
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(340px,420px)] xl:items-start">
+      {/* Dua kolom mulai 1024 px (lg): di bawah itu legenda turun ke bawah peta dan editornya memenuhi lebar. */}
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(340px,420px)] lg:items-start">
         <MapCard area={data} />
         <LegendCard area={data} rows={rows} onChange={onChange} />
       </div>
