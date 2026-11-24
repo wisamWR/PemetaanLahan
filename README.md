@@ -44,14 +44,20 @@ make clean
 
 Parameter benchmark bisa diganti, contoh `make bench BENCH_W=1000 BENCH_H=1000 BENCH_K=4`.
 
-Status saat ini (T4): ada dua varian dengan hasil identik.
+Status saat ini (T5): ada tiga varian dengan hasil identik.
 
 - `kmeans_cuda` (versi utama, T4): akumulasi per blok di shared memory, digabung ke global sekali per blok.
 - `kmeans_cuda_simple` (T3): `atomicAdd` langsung ke memori global. Dipertahankan sebagai pembanding dan
   cadangan; deklarasinya ada di `src/cuda/kmeans_cuda_variants.h`, bukan di header kontrak.
 
-Keduanya menghasilkan label dan centroid identik dengan referensi CPU di semua kasus `make test` dan
-`make test-large`. Hasil benchmark ada di `bench/results/`.
+- `kmeans_cuda_streams` (L3, T5, mode `cuda_streams` di CSV): kernel sama dengan T4, tetapi citra dikirim
+  dan label diambil per potongan lewat memori pinned dan dua stream. Pada pengukuran 24 Nov 2026 varian ini
+  **tidak lebih cepat** daripada T4 (alokasi pinned per panggilan lebih mahal daripada yang dihemat dari
+  tumpang-tindih), jadi T4 tetap versi utama.
+
+Ketiganya menghasilkan label dan centroid identik dengan referensi CPU dan `kmeans_cpu` (L0) di semua kasus
+`make test` dan `make test-large`. Hasil benchmark ada di `bench/results/` (`cuda_simple.csv`,
+`cuda_shared.csv`, `cuda_streams.csv`).
 
 Catatan pengukuran: di WSL 2, durasi dari `cudaEvent` (`kmeans_ms`) terukur sekitar 1 sampai 1,5 %
 lebih besar daripada waktu dinding host (`total_ms`) untuk panggilan yang sama. Penyebabnya belum

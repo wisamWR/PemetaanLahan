@@ -57,6 +57,25 @@ static bool run_case(ImageKind kind, int w, int h, int k, int iters, bool verbos
                         ok ? "LULUS" : "GAGAL", tag.c_str(), tr.total_ms, tc.total_ms, tc.kernel_ms);
         }
     }
+
+    // L3 streams (T5): beberapa ukuran potongan, termasuk potongan sisa yang tidak penuh.
+    const size_t chunks[] = {0, n <= 70000 ? size_t(97) : n / 7 + 3, n / 2 + 1};
+    for (size_t chunk : chunks) {
+        std::vector<int32_t> lc(n, -1);
+        std::vector<uint8_t> cc(k * 3, 0);
+        StageTimes tc{};
+        const std::string tag = "streams(T5,chunk=" + std::to_string(chunk) + ") " + base;
+        ++g_total;
+        if (kmeans_cuda_streams_chunked(img.data(), lc.data(), cc.data(), &p, &tc, chunk) != 0) {
+            std::printf("[GAGAL] %s: galat\n", tag.c_str()); ++g_fail; all_ok = false; continue;
+        }
+        const bool ok = same_result(lr, cr, lc, cc, tag);
+        if (!ok) { ++g_fail; all_ok = false; }
+        if (!ok || (verbose && chunk == 0)) {
+            std::printf("[%s] %s  (cuda_streams total %.1f ms)\n", ok ? "LULUS" : "GAGAL",
+                        tag.c_str(), tc.total_ms);
+        }
+    }
     return all_ok;
 }
 
@@ -79,8 +98,11 @@ int main(int argc, char** argv) {
         for (int k : ks)
             for (ImageKind kind : kinds) run_case(kind, s.w, s.h, k, 20, false);
 
-    // Satu iterasi: label harus sesuai centroid awal (kontrak butir 3.7).
+    // Satu dan dua iterasi: label harus sesuai centroid awal (kontrak butir 3.7); untuk streams,
+    // iterasi pertama sekaligus terakhir (1) dan tanpa iterasi tengah (2).
     run_case(ImageKind::Random, 64, 64, 8, 1, false);
+    run_case(ImageKind::Random, 64, 64, 8, 2, false);
+    run_case(ImageKind::Random, 1000, 1000, 8, 1, false);
 
     if (large) {
         run_case(ImageKind::Random, 7680, 4320, 8, 20, true);

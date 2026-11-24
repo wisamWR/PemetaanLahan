@@ -49,7 +49,9 @@ int main(int argc, char** argv) {
     int (*fn)(const uint8_t*, int32_t*, uint8_t*, const KMeansParams*, StageTimes*) = nullptr;
     if (variant == "shared") fn = kmeans_cuda;
     else if (variant == "simple") fn = kmeans_cuda_simple;
-    else { std::fprintf(stderr, "varian tidak dikenal: %s (shared|simple)\n", variant.c_str()); return 2; }
+    else if (variant == "streams") fn = kmeans_cuda_streams;
+    else { std::fprintf(stderr, "varian tidak dikenal: %s (shared|simple|streams)\n", variant.c_str()); return 2; }
+    const char* mode = (variant == "streams") ? "cuda_streams" : "cuda";
 
     const size_t n = static_cast<size_t>(w) * static_cast<size_t>(h);
     auto img = testutil::make_image(testutil::ImageKind::Random, w, h, 1234);
@@ -87,8 +89,8 @@ int main(int argc, char** argv) {
     }
     char line[512];
     std::snprintf(line, sizeof(line),
-                  "cuda,synthetic_random,%d,%d,%d,%d,0,0,%.3f,%.3f,0,0,%.3f,%.3f,%.3f,%.3f\n", w, h,
-                  k, iters, median(init), median(km), median(tot), median(h2d), median(ker),
+                  "%s,synthetic_random,%d,%d,%d,%d,0,0,%.3f,%.3f,0,0,%.3f,%.3f,%.3f,%.3f\n", mode, w,
+                  h, k, iters, median(init), median(km), median(tot), median(h2d), median(ker),
                   median(d2h));
     std::fputs(line, f);
     std::fclose(f);
