@@ -3,7 +3,7 @@
 #   make cuda    bangun objek CUDA dari src/cuda/*.cu
 #   make test    uji referensi CPU, lalu uji CUDA vs referensi
 #   make bench          benchmark mode cuda, versi utama T4 (CSV ke bench/results/cuda_shared.csv)
-#   make bench-compare  benchmark T3 (simple) dan T4 (shared) pada citra yang sama
+#   make bench-compare  benchmark T3 (simple), T4 (shared), dan T5 (streams) pada citra yang sama
 #   make probe          percobaan analisis bottleneck (assign saja vs T3 vs T4 vs batas memori)
 #   make clean
 
@@ -62,6 +62,7 @@ bench: $(BUILD)/bench_cuda
 bench-compare:
 	$(MAKE) bench BENCH_VARIANT=simple
 	$(MAKE) bench BENCH_VARIANT=shared
+	$(MAKE) bench BENCH_VARIANT=streams
 
 probe: $(BUILD)/probe_cuda
 	./$(BUILD)/probe_cuda --width $(BENCH_W) --height $(BENCH_H) --k $(BENCH_K) \

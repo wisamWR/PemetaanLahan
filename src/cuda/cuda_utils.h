@@ -60,4 +60,31 @@ struct DeviceEvent {
     cudaError_t create() { return cudaEventCreate(&ev); }
 };
 
+// Memori host pinned (cudaHostAlloc) yang otomatis dibebaskan.
+template <typename T>
+struct PinnedBuffer {
+    T* ptr = nullptr;
+    PinnedBuffer() = default;
+    PinnedBuffer(const PinnedBuffer&) = delete;
+    PinnedBuffer& operator=(const PinnedBuffer&) = delete;
+    ~PinnedBuffer() {
+        if (ptr != nullptr) CUDA_WARN(cudaFreeHost(ptr));
+    }
+    cudaError_t alloc(size_t count) {
+        return cudaHostAlloc(reinterpret_cast<void**>(&ptr), count * sizeof(T), cudaHostAllocDefault);
+    }
+};
+
+// Stream CUDA non-blocking yang otomatis dihancurkan.
+struct DeviceStream {
+    cudaStream_t s = nullptr;
+    DeviceStream() = default;
+    DeviceStream(const DeviceStream&) = delete;
+    DeviceStream& operator=(const DeviceStream&) = delete;
+    ~DeviceStream() {
+        if (s != nullptr) CUDA_WARN(cudaStreamDestroy(s));
+    }
+    cudaError_t create() { return cudaStreamCreateWithFlags(&s, cudaStreamNonBlocking); }
+};
+
 #endif  // CUDA_UTILS_H
