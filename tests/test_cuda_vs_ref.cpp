@@ -1,21 +1,23 @@
-// test_cuda_vs_ref.cpp - kmeans_cuda harus IDENTIK (label dan centroid) dengan ref_kmeans.
+// test_cuda_vs_ref.cpp - kmeans_cuda (T4) dan kmeans_cuda_simple (T3) harus IDENTIK
+// (label dan centroid) dengan ref_kmeans. Tiap kasus dihitung sebagai dua uji (satu per varian).
 //
 // Pemakaian:
 //   test_cuda_vs_ref            uji kecil-menengah (ukuran x K x jenis citra)
 //   test_cuda_vs_ref --small    hanya citra kecil (untuk compute-sanitizer)
 //   test_cuda_vs_ref --large    tambah 7680x4320 K=8 dan uji muat 10980x10980 K=8
-//
-// Di T1 berkas ini sengaja gagal di tahap link karena kmeans_cuda belum ada (dibuat di T3).
 #include <cstdio>
 #include <cstring>
 #include <string>
 #include <vector>
 
 #include "kmeans.h"
+#include "kmeans_cuda_variants.h"
 #include "ref_kmeans.h"
 #include "test_util.h"
 
 using namespace testutil;
+
+typedef int (*KMeansFn)(const uint8_t*, int32_t*, uint8_t*, const KMeansParams*, StageTimes*);
 
 static int g_fail = 0, g_total = 0;
 
@@ -25,26 +27,37 @@ static bool run_case(ImageKind kind, int w, int h, int k, int iters, bool verbos
     KMeansParams p{};
     p.width = w; p.height = h; p.k = k; p.max_iter = iters; p.seed = 42; p.num_threads = 1;
 
-    std::vector<int32_t> lr(n), lc(n, -1);
-    std::vector<uint8_t> cr(k * 3), cc(k * 3, 0);
-    StageTimes tr{}, tc{};
-    char tag[160];
-    std::snprintf(tag, sizeof(tag), "%s %dx%d K=%d iter=%d", kind_name(kind), w, h, k, iters);
+    std::vector<int32_t> lr(n);
+    std::vector<uint8_t> cr(k * 3);
+    StageTimes tr{};
+    char base[160];
+    std::snprintf(base, sizeof(base), "%s %dx%d K=%d iter=%d", kind_name(kind), w, h, k, iters);
 
-    ++g_total;
     if (ref_kmeans(img.data(), lr.data(), cr.data(), &p, &tr) != 0) {
-        std::printf("[GAGAL] %s: ref_kmeans galat\n", tag); ++g_fail; return false;
+        std::printf("[GAGAL] %s: ref_kmeans galat\n", base); ++g_total; ++g_fail; return false;
     }
-    if (kmeans_cuda(img.data(), lc.data(), cc.data(), &p, &tc) != 0) {
-        std::printf("[GAGAL] %s: kmeans_cuda galat\n", tag); ++g_fail; return false;
+
+    // Kedua varian CUDA dibandingkan dengan referensi yang sama.
+    struct Variant { const char* name; KMeansFn fn; };
+    const Variant variants[] = {{"simple(T3)", kmeans_cuda_simple}, {"shared(T4)", kmeans_cuda}};
+    bool all_ok = true;
+    for (const auto& v : variants) {
+        std::vector<int32_t> lc(n, -1);
+        std::vector<uint8_t> cc(k * 3, 0);
+        StageTimes tc{};
+        const std::string tag = std::string(v.name) + " " + base;
+        ++g_total;
+        if (v.fn(img.data(), lc.data(), cc.data(), &p, &tc) != 0) {
+            std::printf("[GAGAL] %s: galat\n", tag.c_str()); ++g_fail; all_ok = false; continue;
+        }
+        const bool ok = same_result(lr, cr, lc, cc, tag);
+        if (!ok) { ++g_fail; all_ok = false; }
+        if (!ok || verbose) {
+            std::printf("[%s] %s  (ref %.1f ms, cuda total %.1f ms, kernel %.1f ms)\n",
+                        ok ? "LULUS" : "GAGAL", tag.c_str(), tr.total_ms, tc.total_ms, tc.kernel_ms);
+        }
     }
-    const bool ok = same_result(lr, cr, lc, cc, tag);
-    if (!ok) ++g_fail;
-    if (!ok || verbose) {
-        std::printf("[%s] %s  (ref %.1f ms, cuda total %.1f ms, kernel %.1f ms)\n",
-                    ok ? "LULUS" : "GAGAL", tag, tr.total_ms, tc.total_ms, tc.kernel_ms);
-    }
-    return ok;
+    return all_ok;
 }
 
 int main(int argc, char** argv) {

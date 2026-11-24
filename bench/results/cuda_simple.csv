@@ -1,0 +1,5 @@
+mode,image,width,height,k,iters,threads,read_ms,init_ms,kmeans_ms,color_ms,write_ms,total_ms,h2d_ms,kernel_ms,d2h_ms
+cuda,synthetic_random,7680,4320,8,20,0,0,0.002,1454.813,0,0,1450.452,37.284,1353.271,51.167
+cuda,synthetic_random,7680,4320,8,20,0,0,0.001,1296.993,0,0,1281.972,22.750,1241.933,27.809
+cuda,synthetic_random,7680,4320,4,20,0,0,0.001,1232.839,0,0,1254.877,19.622,1183.388,26.487
+cuda,synthetic_random,7680,4320,16,20,0,0,0.002,894.077,0,0,893.041,20.660,843.752,31.378
