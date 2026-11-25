@@ -117,6 +117,14 @@ class RunResult:
     def kmeans_device(self) -> str:
         return str(self.meta["kmeans_device"])
 
+    @property
+    def nodata_pixels(self) -> int:
+        return int(self.meta.get("nodata_pixels", 0))
+
+    @property
+    def nodata_cluster(self) -> int:
+        return int(self.meta.get("nodata_cluster", -1))
+
 
 @dataclass(frozen=True, eq=False)
 class BatchResult:
@@ -222,6 +230,10 @@ def _check_meta(meta: Any, problems: list[str]) -> bool:
             ok = False
         elif not isinstance(meta[key], str):
             problems.append(f"meta.json: '{key}' harus teks, ditemukan {meta[key]!r}")
+            ok = False
+    for key in ("nodata_pixels", "nodata_cluster"):
+        if key in meta and not _is_int(meta[key]):
+            problems.append(f"meta.json: '{key}' harus bilangan bulat, ditemukan {meta[key]!r}")
             ok = False
     return ok
 
@@ -444,6 +456,22 @@ def validate(run: RunResult) -> list[str]:
             f"jumlah counts ({int(run.counts.sum())}) tidak sama dengan "
             f"width*height ({run.n_pixels})"
         )
+
+    nd_pixels = run.nodata_pixels
+    nd_cluster = run.nodata_cluster
+    if nd_pixels < 0:
+        problems.append(f"nodata_pixels tidak boleh negatif, ditemukan {nd_pixels}")
+    elif nd_pixels == 0:
+        if nd_cluster != -1:
+            problems.append(f"nodata_pixels = 0 tetapi nodata_cluster = {nd_cluster} (harus -1)")
+    else:
+        if not (0 <= nd_cluster < k):
+            problems.append(f"nodata_cluster {nd_cluster} di luar rentang 0..{k - 1}")
+        elif nd_cluster < len(run.counts) and nd_pixels > int(run.counts[nd_cluster]):
+            problems.append(
+                f"nodata_pixels ({nd_pixels}) melebihi jumlah piksel cluster {nd_cluster} "
+                f"({int(run.counts[nd_cluster])})"
+            )
 
     if run.labels_preview.ndim != 2 or run.labels_preview.size == 0:
         problems.append(f"labels_preview harus gambar 2D tidak kosong, ditemukan {run.labels_preview.shape}")

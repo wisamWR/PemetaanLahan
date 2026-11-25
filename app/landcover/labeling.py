@@ -27,6 +27,7 @@ import pandas as pd
 CLASS_PRESETS = ["Vegetasi", "Air", "Lahan terbangun", "Lahan terbuka", "Awan/bayangan", "Lainnya"]
 UNNAMED = "Belum diberi nama"
 TOTAL_LABEL = "Total"            # nama baris jumlah di `area_table`; tidak boleh jadi nama kelas
+NODATA_LABEL = "Nodata (dikecualikan)"   # nama baris piksel nodata (0,0,0) di `area_table` (terpisah dari Total)
 
 ClassMap = dict[int, str]        # id cluster -> nama kelas
 
@@ -85,6 +86,8 @@ def normalize_class_name(name: str) -> str:
         return UNNAMED
     if cleaned.casefold() == TOTAL_LABEL.casefold():
         raise ValueError(f'nama kelas "{TOTAL_LABEL}" dicadangkan untuk baris jumlah')
+    if cleaned.casefold() == NODATA_LABEL.casefold():
+        raise ValueError(f'nama kelas "{NODATA_LABEL}" dicadangkan untuk piksel nodata')
     return cleaned
 
 
@@ -132,60 +135,137 @@ def _area_ha(pixels: np.ndarray, pixel_size_m: float) -> np.ndarray:
     return pixels.astype(np.float64) * (pixel_size_m * pixel_size_m) / _M2_PER_HA
 
 
-def cluster_table(counts, centroids, pixel_size_m: float = 10.0) -> pd.DataFrame:
-    """Satu baris per cluster, urut id: cluster, r, g, b, piksel, persen, luas_ha."""
+def _valid_counts(pixels: np.ndarray, nodata_pixels: int, nodata_cluster: int) -> tuple[np.ndarray, int, int]:
+    """Kurangi piksel nodata (0,0,0) dari cluster-nya setelah validasi konsistensi (U7)."""
+    if isinstance(nodata_pixels, bool) or not isinstance(nodata_pixels, (int, np.integer)):
+        raise ValueError(f"nodata_pixels harus integer, ditemukan {nodata_pixels!r}")
+    if isinstance(nodata_cluster, bool) or not isinstance(nodata_cluster, (int, np.integer)):
+        raise ValueError(f"nodata_cluster harus integer, ditemukan {nodata_cluster!r}")
+    nd_px = int(nodata_pixels)
+    nd_cl = int(nodata_cluster)
+    if nd_px < 0:
+        raise ValueError(f"nodata_pixels tidak boleh negatif, ditemukan {nd_px}")
+    if nd_px == 0:
+        if nd_cl != -1:
+            raise ValueError(f"nodata_pixels = 0 tetapi nodata_cluster = {nd_cl} (harus -1)")
+        return pixels, 0, -1
+    if not 0 <= nd_cl < len(pixels):
+        raise ValueError(f"nodata_cluster {nd_cl} di luar rentang 0..{len(pixels) - 1}")
+    if nd_px > int(pixels[nd_cl]):
+        raise ValueError(f"nodata_pixels ({nd_px}) melebihi piksel cluster {nd_cl} ({int(pixels[nd_cl])})")
+    valid = pixels.copy()
+    valid[nd_cl] -= nd_px
+    return valid, nd_px, nd_cl
+
+
+def cluster_table(
+    counts,
+    centroids,
+    pixel_size_m: float = 10.0,
+    *,
+    nodata_pixels: int = 0,
+    nodata_cluster: int = -1,
+) -> pd.DataFrame:
+    """Satu baris per cluster, urut id: cluster, r, g, b, piksel, persen, luas_ha.
+
+    Bila `nodata_pixels > 0`, nodata dikurangi dari `nodata_cluster` dan persen dihitung
+    terhadap piksel valid.
+    """
     pixels = _check_counts(counts)
     rgb = _check_centroids(centroids, len(pixels))
     size = _check_pixel_size(pixel_size_m)
-    total = int(pixels.sum())
+    valid, _, _ = _valid_counts(pixels, nodata_pixels, nodata_cluster)
+    total = int(valid.sum())
     return pd.DataFrame(
         {
             "cluster": np.arange(len(pixels), dtype=np.int64),
             "r": rgb[:, 0],
             "g": rgb[:, 1],
             "b": rgb[:, 2],
-            "piksel": pixels,
-            "persen": _percent(pixels, total),
-            "luas_ha": _area_ha(pixels, size),
+            "piksel": valid,
+            "persen": _percent(valid, total),
+            "luas_ha": _area_ha(valid, size),
         }
     )
 
 
-def area_table(counts, class_map: ClassMap, pixel_size_m: float = 10.0) -> pd.DataFrame:
+def area_table(
+    counts,
+    class_map: ClassMap,
+    pixel_size_m: float = 10.0,
+    *,
+    nodata_pixels: int = 0,
+    nodata_cluster: int = -1,
+) -> pd.DataFrame:
     """Tabel luas per kelas: kelas, cluster, piksel, persen, luas_ha, plus baris `Total`.
 
     Cluster bernama kelas sama digabung. Baris kelas diurut menurut id cluster
     terkecil di tiap kelas; kolom `cluster` berisi id yang digabung sebagai teks
     ("0, 3"), supaya tampil dan diekspor ke CSV apa adanya. Baris `Total` selalu
-    terakhir (kelas = `TOTAL_LABEL`, cluster kosong, persen 100 bila ada piksel).
-    Cluster yang tidak ada di `class_map` dianggap `UNNAMED`.
+    menutup kelas valid (persen 100 bila ada piksel valid). Bila `nodata_pixels > 0`,
+    nodata dikurangi dari cluster-nya, persen dihitung dari piksel valid, dan baris
+    `NODATA_LABEL` ditambahkan terpisah sesudah `Total` (tidak masuk Total). Cluster
+    yang seluruhnya nodata tidak dimasukkan ke baris kelas valid.
     """
     pixels = _check_counts(counts)
     size = _check_pixel_size(pixel_size_m)
     names = _normalized_class_map(class_map, len(pixels))
+    valid, nd_px, nd_cl = _valid_counts(pixels, nodata_pixels, nodata_cluster)
+    pure_nodata = nd_cl if (nd_px > 0 and int(valid[nd_cl]) == 0) else None
 
     groups: dict[str, list[int]] = {}
     for idx in range(len(pixels)):                    # urutan id => urutan baris
+        if idx == pure_nodata:
+            continue
         groups.setdefault(names[idx], []).append(idx)
 
-    total = int(pixels.sum())
-    class_pixels = np.array([pixels[ids].sum() for ids in groups.values()], dtype=np.int64)
-    table = pd.DataFrame(
-        {
-            "kelas": list(groups),
-            "cluster": [", ".join(str(i) for i in ids) for ids in groups.values()],
-            "piksel": class_pixels,
-            "persen": _percent(class_pixels, total),
-            "luas_ha": _area_ha(class_pixels, size),
-        }
-    )
-    total_row = pd.DataFrame(
-        {
-            "kelas": [TOTAL_LABEL],
-            "cluster": [""],
-            "piksel": np.array([total], dtype=np.int64),
-            "persen": [100.0 if total > 0 else 0.0],
-            "luas_ha": _area_ha(np.array([total], dtype=np.int64), size),
-        }
-    )
-    return pd.concat([table, total_row], ignore_index=True)
+    total_valid = int(valid.sum())
+    if groups:
+        class_pixels = np.array([valid[ids].sum() for ids in groups.values()], dtype=np.int64)
+        table = pd.DataFrame(
+            {
+                "kelas": list(groups),
+                "cluster": [", ".join(str(i) for i in ids) for ids in groups.values()],
+                "piksel": class_pixels,
+                "persen": _percent(class_pixels, total_valid),
+                "luas_ha": _area_ha(class_pixels, size),
+            }
+        )
+    else:
+        table = pd.DataFrame(
+            {
+                "kelas": pd.Series(dtype="object"),
+                "cluster": pd.Series(dtype="object"),
+                "piksel": pd.Series(dtype=np.int64),
+                "persen": pd.Series(dtype=np.float64),
+                "luas_ha": pd.Series(dtype=np.float64),
+            }
+        )
+
+    parts = [
+        table,
+        pd.DataFrame(
+            {
+                "kelas": [TOTAL_LABEL],
+                "cluster": [""],
+                "piksel": np.array([total_valid], dtype=np.int64),
+                "persen": [100.0 if total_valid > 0 else 0.0],
+                "luas_ha": _area_ha(np.array([total_valid], dtype=np.int64), size),
+            }
+        ),
+    ]
+    if nd_px > 0:
+        all_pixels = int(pixels.sum())
+        nd_arr = np.array([nd_px], dtype=np.int64)
+        parts.append(
+            pd.DataFrame(
+                {
+                    "kelas": [NODATA_LABEL],
+                    "cluster": [str(nd_cl)],
+                    "piksel": nd_arr,
+                    "persen": _percent(nd_arr, all_pixels),
+                    "luas_ha": _area_ha(nd_arr, size),
+                }
+            )
+        )
+    return pd.concat(parts, ignore_index=True)

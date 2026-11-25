@@ -242,6 +242,9 @@ export interface ClusterRow {
   area_ha: number
   area_text: string
   invalid: boolean
+  all_nodata: boolean
+  nodata_pixels: number
+  nodata_badge: string | null
 }
 
 export interface AreaRow {
@@ -251,6 +254,7 @@ export interface AreaRow {
   colors: string[]
   unnamed: boolean
   is_total: boolean
+  is_nodata: boolean
   pixels: number
   pixels_text: string
   percent: number
@@ -290,6 +294,13 @@ export interface AreaResponse {
   presets: string[]
   unnamed_label: string
   total_label: string
+  nodata_label: string
+  nodata: {
+    pixels: number
+    cluster: number
+    percent: number | null
+    note: string | null
+  }
   name_max_chars: number
   names: string[]
   palette: string[]

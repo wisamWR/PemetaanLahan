@@ -12,6 +12,7 @@ from PIL import Image
 from landcover.contract import read_run, validate
 from landcover.labeling import (
     CLASS_PRESETS,
+    NODATA_LABEL,
     TOTAL_LABEL,
     UNNAMED,
     area_table,
@@ -410,3 +411,63 @@ def test_run_mock_tile_penuh_memakai_counts_resolusi_penuh(tmp_path):
     ct = cluster_table(run.counts, run.centroids, size)
     assert len(ct) == 8 and ct["piksel"].tolist() == run.counts.tolist()
     assert ct["luas_ha"].sum() == pytest.approx(1_205_604, rel=1e-12)
+
+
+# --------------------------------------------------------------------------- #
+# Pengecualian nodata (0,0,0) — U7
+# --------------------------------------------------------------------------- #
+
+def test_nodata_cluster_campuran_dikurangi_dan_baris_terpisah():
+    # Cluster 0 berisi 200 nodata + 100 piksel gelap valid; cluster 1 & 2 berisi 300 & 400.
+    counts = [300, 300, 400]
+    ct = cluster_table(counts, RGB4[:3], 10.0, nodata_pixels=200, nodata_cluster=0)
+    assert ct["piksel"].tolist() == [100, 300, 400]
+    assert ct["persen"].tolist() == pytest.approx([12.5, 37.5, 50.0])
+    assert ct["luas_ha"].tolist() == pytest.approx([1.0, 3.0, 4.0])
+
+    at = area_table(counts, {0: "Air", 1: "Vegetasi", 2: "Lahan terbuka"}, 10.0, nodata_pixels=200, nodata_cluster=0)
+    assert at["kelas"].tolist() == ["Air", "Vegetasi", "Lahan terbuka", TOTAL_LABEL, NODATA_LABEL]
+    r = rows(at)
+    assert r["Air"]["piksel"] == 100 and r["Air"]["persen"] == pytest.approx(12.5)
+    assert r[TOTAL_LABEL]["piksel"] == 800 and r[TOTAL_LABEL]["persen"] == 100.0 and r[TOTAL_LABEL]["luas_ha"] == 8.0
+    assert r[NODATA_LABEL]["cluster"] == "0" and r[NODATA_LABEL]["piksel"] == 200
+    assert r[NODATA_LABEL]["persen"] == pytest.approx(20.0) and r[NODATA_LABEL]["luas_ha"] == 2.0
+    assert r[TOTAL_LABEL]["luas_ha"] + r[NODATA_LABEL]["luas_ha"] == pytest.approx(10.0)
+
+
+def test_nodata_cluster_murni_tidak_duplikat_di_area_table_dan_tile_penuh():
+    nd = 7_715_866                      # ~6,4 % dari tile 10980^2
+    valid1, valid2 = (TILE_PIXELS - nd) // 2, TILE_PIXELS - nd - (TILE_PIXELS - nd) // 2
+    counts = [nd, valid1, valid2]
+    ct = cluster_table(counts, RGB4[:3], 10.0, nodata_pixels=nd, nodata_cluster=0)
+    assert ct["piksel"].tolist() == [0, valid1, valid2]
+    assert ct["persen"].sum() == pytest.approx(100.0)
+
+    at = area_table(counts, {1: "Vegetasi", 2: "Air"}, 10.0, nodata_pixels=nd, nodata_cluster=0)
+    assert at["kelas"].tolist() == ["Vegetasi", "Air", TOTAL_LABEL, NODATA_LABEL]
+    r = rows(at)
+    assert r[TOTAL_LABEL]["persen"] == 100.0
+    assert r[TOTAL_LABEL]["luas_ha"] + r[NODATA_LABEL]["luas_ha"] == pytest.approx(1_205_604.0)
+
+
+def test_semua_piksel_nodata_aman_tanpa_nan():
+    at = area_table([100], {0: UNNAMED}, 10.0, nodata_pixels=100, nodata_cluster=0)
+    assert at["kelas"].tolist() == [TOTAL_LABEL, NODATA_LABEL]
+    r = rows(at)
+    assert r[TOTAL_LABEL]["piksel"] == 0 and r[TOTAL_LABEL]["persen"] == 0.0 and r[TOTAL_LABEL]["luas_ha"] == 0.0
+    assert r[NODATA_LABEL]["piksel"] == 100 and r[NODATA_LABEL]["persen"] == 100.0 and r[NODATA_LABEL]["luas_ha"] == 1.0
+
+
+@pytest.mark.parametrize("nd_px, nd_cl", [
+    (-1, -1), (0, 0), (10, -1), (10, 2), (101, 0), (True, 0), (10, True),
+])
+def test_nodata_tidak_sah_ditolak(nd_px, nd_cl):
+    with pytest.raises(ValueError):
+        cluster_table([100, 50], RGB4[:2], nodata_pixels=nd_px, nodata_cluster=nd_cl)
+    with pytest.raises(ValueError):
+        area_table([100, 50], {0: "Air"}, nodata_pixels=nd_px, nodata_cluster=nd_cl)
+
+
+def test_nama_nodata_dicadangkan():
+    with pytest.raises(ValueError, match="dicadangkan"):
+        normalize_class_name(NODATA_LABEL)

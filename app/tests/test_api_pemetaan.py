@@ -534,3 +534,40 @@ def test_buat_peta_optimalisasi_lalu_luas_dan_ekspor(app):
     assert http.get(app, f"/api/runs/{rid}/export/area", **names_q(d["names"])).status == 200
     full = http.get(app, f"/api/runs/{rid}/export/full")                       # run tiruan: tanpa labels.u8
     assert full.status == 404
+
+
+def test_area_dan_ekspor_mengecualikan_nodata_murni_dan_campuran(app, settings):
+    # Kasus 1: cluster nodata murni (cluster 0 seluruhnya nodata)
+    rid_pure = "ndmurni__opt-auto__k4_it20_s42_t8"
+    write_run_dir(
+        settings.runs_dir / "mock" / rid_pure, width=W, height=H, k=K,
+        counts=[300, 772, 1000, 1000],
+        meta={"mock": False, "dataset": "ndmurni", "nodata_pixels": 300, "nodata_cluster": 0},
+    )
+    dp = area(app, rid_pure, {"1": "Vegetasi", "2": "Air"}).json()
+    assert dp["nodata"]["pixels"] == 300 and dp["nodata"]["cluster"] == 0
+    assert "300 piksel nodata" in dp["nodata"]["note"] and "dikecualikan dari luas" in dp["nodata"]["note"]
+    assert dp["clusters"][0]["all_nodata"] is True and dp["clusters"][0]["nodata_badge"] == "Seluruhnya nodata"
+    assert dp["clusters"][0]["pixels"] == 0 and dp["clusters"][1]["all_nodata"] is False
+    assert [r["name"] for r in dp["area"]] == ["Vegetasi", "Air", UNNAMED, "Total", "Nodata (dikecualikan)"]
+    total_row, nd_row = dp["area"][3], dp["area"][4]
+    assert total_row["is_total"] is True and total_row["pixels"] == 2772 and total_row["percent_text"] == "100.00 %"
+    assert nd_row["is_nodata"] is True and nd_row["pixels"] == 300 and nd_row["clusters"] == "0"
+    assert total_row["area_ha"] + nd_row["area_ha"] == pytest.approx(W * H * 0.01)
+
+    csv_text = http.get(app, f"/api/runs/{rid_pure}/export/area", **names_q(dp["names"])).body.decode("utf-8")
+    assert "Nodata (dikecualikan),0,300," in csv_text
+
+    # Kasus 2: nodata bercampur dengan piksel valid di cluster yang sama (cluster 0 punya 300 nodata + 200 valid)
+    rid_mix = "ndcampur__opt-auto__k4_it20_s42_t8"
+    write_run_dir(
+        settings.runs_dir / "mock" / rid_mix, width=W, height=H, k=K,
+        counts=[500, 572, 1000, 1000],
+        meta={"mock": False, "dataset": "ndcampur", "nodata_pixels": 300, "nodata_cluster": 0},
+    )
+    dm = area(app, rid_mix, {"0": "Air"}).json()
+    assert dm["clusters"][0]["all_nodata"] is False
+    assert dm["clusters"][0]["pixels"] == 200 and dm["clusters"][0]["nodata_pixels"] == 300
+    assert "300" in dm["clusters"][0]["nodata_badge"]
+    assert [r["name"] for r in dm["area"]] == ["Air", UNNAMED, "Total", "Nodata (dikecualikan)"]
+    assert next(r for r in dm["area"] if r["name"] == "Air")["pixels"] == 200

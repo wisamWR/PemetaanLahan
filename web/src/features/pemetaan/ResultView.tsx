@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { TriangleAlert } from 'lucide-react'
+import { Info, TriangleAlert } from 'lucide-react'
 import { KpiCell, KpiStrip } from '@/components/KpiStrip'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -169,6 +169,12 @@ export function ResultView({ run }: { run: RunSummary }) {
           />
         ))}
       </KpiStrip>
+      {data.nodata.note && (
+        <Alert variant="info" data-testid="nodata-note">
+          <Info />
+          <AlertDescription>{data.nodata.note}</AlertDescription>
+        </Alert>
+      )}
       {/* Dua kolom mulai 1024 px (lg): di bawah itu legenda turun ke bawah peta dan editornya memenuhi lebar. */}
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(340px,420px)] lg:items-start">
         <MapCard area={data} />

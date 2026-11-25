@@ -245,6 +245,35 @@ def test_validate_mengumpulkan_semua_masalah(make_run_dir):
     assert len(validate(run)) >= 2
 
 
+def test_nodata_opsional_dan_valid(make_run_dir):
+    old = read_run(make_run_dir())
+    assert old.nodata_pixels == 0 and old.nodata_cluster == -1 and validate(old) == []
+    with_nd = read_run(make_run_dir(meta={"nodata_pixels": 50, "nodata_cluster": 1}))
+    assert with_nd.nodata_pixels == 50 and with_nd.nodata_cluster == 1 and validate(with_nd) == []
+    no_nd = read_run(make_run_dir(meta={"nodata_pixels": 0, "nodata_cluster": -1}))
+    assert no_nd.nodata_pixels == 0 and no_nd.nodata_cluster == -1 and validate(no_nd) == []
+
+
+@pytest.mark.parametrize("meta_patch, fragment", [
+    ({"nodata_pixels": -1, "nodata_cluster": -1}, "negatif"),
+    ({"nodata_pixels": 0, "nodata_cluster": 0}, "harus -1"),
+    ({"nodata_pixels": 10, "nodata_cluster": -1}, "di luar rentang"),
+    ({"nodata_pixels": 10, "nodata_cluster": 4}, "di luar rentang"),
+    ({"nodata_pixels": 769, "nodata_cluster": 0}, "melebihi"),
+])
+def test_nodata_tidak_konsisten_ditolak_validate(make_run_dir, meta_patch, fragment):
+    run = read_run(make_run_dir(meta=meta_patch))
+    assert has(validate(run), fragment)
+
+
+@pytest.mark.parametrize("meta_patch", [
+    {"nodata_pixels": "5"}, {"nodata_pixels": True}, {"nodata_cluster": 1.5}, {"nodata_cluster": False},
+])
+def test_nodata_tipe_salah_ditolak_read_run(make_run_dir, meta_patch):
+    with pytest.raises(ContractError):
+        read_run(make_run_dir(meta=meta_patch))
+
+
 # --------------------------------------------------------------------------- #
 # read_run(): struktur rusak -> ContractError
 # --------------------------------------------------------------------------- #

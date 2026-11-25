@@ -137,9 +137,9 @@ function Swatches({ colors }: { colors: string[] }) {
   )
 }
 
-/** Bilah persen tipis di sel tabel (Kajabi): lebar = persen dari seluruh piksel, warna = warna kelas. */
+/** Bilah persen tipis di sel tabel (Kajabi): lebar = persen dari seluruh piksel valid, warna = warna kelas. */
 function ShareBar({ row }: { row: AreaRow }) {
-  if (row.is_total) return null
+  if (row.is_total || row.is_nodata) return null
   const color = row.unnamed ? 'var(--muted-foreground)' : (row.colors[0] ?? 'var(--muted-foreground)')
   return (
     <span className="hidden h-1.5 w-16 overflow-hidden rounded-full bg-muted sm:block" aria-hidden>
@@ -169,15 +169,19 @@ export function AreaCard({ area }: { area: AreaResponse }) {
         <ul className="divide-y rounded-lg border sm:hidden" data-testid="area-list" aria-label="Luas per kelas">
           {area.area.map((row) => (
             <li
-              key={row.is_total ? '__total' : row.name}
-              className={cn('flex flex-col gap-1.5 px-3 py-2.5', row.is_total && 'bg-muted/40 font-semibold')}
+              key={row.is_total ? '__total' : row.is_nodata ? '__nodata' : row.name}
+              className={cn(
+                'flex flex-col gap-1.5 px-3 py-2.5',
+                row.is_total && 'bg-muted/40 font-semibold',
+                row.is_nodata && 'bg-muted/20 text-muted-foreground',
+              )}
             >
               <div className="flex items-center gap-2">
-                {!row.is_total && <Swatches colors={row.colors} />}
-                <span className={cn('min-w-0 flex-1 break-words', row.unnamed && 'text-muted-foreground italic')}>{row.name}</span>
+                {!row.is_total && !row.is_nodata && <Swatches colors={row.colors} />}
+                <span className={cn('min-w-0 flex-1 break-words', (row.unnamed || row.is_nodata) && 'text-muted-foreground italic')}>{row.name}</span>
                 <span className="shrink-0 tabular-nums">{row.percent_text}</span>
               </div>
-              {!row.is_total && (
+              {!row.is_total && !row.is_nodata && (
                 <span className="block h-1.5 overflow-hidden rounded-full bg-muted" aria-hidden>
                   <span
                     className="block h-full rounded-full"
@@ -205,14 +209,17 @@ export function AreaCard({ area }: { area: AreaResponse }) {
           <TableBody>
             {area.area.map((row) => (
               <TableRow
-                key={row.is_total ? '__total' : row.name}
-                className={cn(row.is_total && 'bg-muted/40 font-semibold hover:bg-muted/40')}
-                data-testid={row.is_total ? 'area-total' : `area-row-${row.name}`}
+                key={row.is_total ? '__total' : row.is_nodata ? '__nodata' : row.name}
+                className={cn(
+                  row.is_total && 'bg-muted/40 font-semibold hover:bg-muted/40',
+                  row.is_nodata && 'bg-muted/20 text-muted-foreground hover:bg-muted/20',
+                )}
+                data-testid={row.is_total ? 'area-total' : row.is_nodata ? 'area-nodata' : `area-row-${row.name}`}
               >
                 <TableCell>
                   <span className="flex items-center gap-2">
-                    {!row.is_total && <Swatches colors={row.colors} />}
-                    <span className={cn('min-w-0 break-words', row.unnamed && 'text-muted-foreground italic')}>{row.name}</span>
+                    {!row.is_total && !row.is_nodata && <Swatches colors={row.colors} />}
+                    <span className={cn('min-w-0 break-words', (row.unnamed || row.is_nodata) && 'text-muted-foreground italic')}>{row.name}</span>
                   </span>
                 </TableCell>
                 <TableCell className="hidden text-muted-foreground tabular-nums sm:table-cell">{row.clusters}</TableCell>

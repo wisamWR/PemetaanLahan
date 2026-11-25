@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ChevronDown, TriangleAlert } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -28,8 +29,8 @@ function CompactLegend({ area }: { area: AreaResponse }) {
       {area.clusters.map((c) => (
         <li key={c.cluster} className="flex items-center gap-2.5 py-2 first:pt-0 last:pb-0" data-testid={`legend-compact-${c.cluster}`}>
           <span className="size-4 shrink-0 rounded-md ring-1 ring-foreground/15" style={{ background: c.class_hex }} aria-hidden />
-          <span className={cn('min-w-0 flex-1 truncate text-sm', c.name === area.unnamed_label && 'text-muted-foreground')}>
-            {c.name}
+          <span className={cn('min-w-0 flex-1 truncate text-sm', (c.name === area.unnamed_label || c.all_nodata) && 'text-muted-foreground')}>
+            {c.all_nodata ? `Cluster ${c.cluster} (${c.nodata_badge})` : c.name}
           </span>
           <span className="shrink-0 text-xs text-muted-foreground tabular-nums">{c.percent_text}</span>
         </li>
@@ -91,11 +92,23 @@ export function LegendCard({ area, rows, onChange }: Props) {
                     aria-hidden
                   />
                   <span className="text-sm font-medium">Cluster {c.cluster}</span>
-                  {conflict && <span className="min-w-0 truncate text-xs text-muted-foreground">dipakai: {c.name}</span>}
+                  {c.nodata_badge && (
+                    <Badge
+                      variant="outline"
+                      className="text-[11px] font-normal text-muted-foreground"
+                      data-testid={`nodata-badge-${c.cluster}`}
+                    >
+                      {c.nodata_badge}
+                    </Badge>
+                  )}
+                  {conflict && !c.all_nodata && (
+                    <span className="min-w-0 truncate text-xs text-muted-foreground">dipakai: {c.name}</span>
+                  )}
                   <span className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums">{c.percent_text}</span>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <Select
+                    disabled={c.all_nodata}
                     value={entry.kelas ?? ''}
                     onValueChange={(v) => onChange(c.cluster, { kelas: v === NONE ? null : v })}
                   >
@@ -112,8 +125,9 @@ export function LegendCard({ area, rows, onChange }: Props) {
                     </SelectContent>
                   </Select>
                   <Input
+                    disabled={c.all_nodata}
                     className={cn('h-8 text-sm', c.invalid && 'border-destructive')}
-                    placeholder="Nama lain"
+                    placeholder={c.all_nodata ? 'Dikecualikan (nodata)' : 'Nama lain'}
                     aria-label={`Nama lain cluster ${c.cluster}`}
                     aria-invalid={c.invalid || undefined}
                     title={area.help.other}

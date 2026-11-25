@@ -782,6 +782,56 @@ bool count_labels(const int32_t* labels, size_t n, int k, bool parallel, uint64_
     return ok;
 }
 
+struct NodataStats {
+    uint64_t pixels = 0;
+    int cluster = -1;
+};
+
+// Hitung piksel nodata (0,0,0) dan pastikan semua mendapat label cluster yang sama (U7).
+// Dipanggil di tahap pendamping (aux_ms), sebelum colorize() menimpa buffer RGB.
+NodataStats compute_nodata(const uint8_t* rgb, const int32_t* labels, size_t n, int k, bool parallel) {
+    uint64_t total = 0;
+    int cluster = -1;
+    bool conflict = false;
+    bool bad_label = false;
+    const ptrdiff_t len = static_cast<ptrdiff_t>(n);
+#pragma omp parallel if (parallel)
+    {
+        uint64_t local_cnt = 0;
+        int local_cluster = -1;
+        bool local_conflict = false;
+        bool local_bad = false;
+#pragma omp for schedule(static) nowait
+        for (ptrdiff_t i = 0; i < len; ++i) {
+            const uint8_t* px = rgb + static_cast<size_t>(i) * 3;
+            if (px[0] == 0 && px[1] == 0 && px[2] == 0) {
+                const int32_t l = labels[i];
+                if (static_cast<uint32_t>(l) >= static_cast<uint32_t>(k)) {
+                    local_bad = true;
+                } else if (local_cluster < 0) {
+                    local_cluster = l;
+                } else if (local_cluster != l) {
+                    local_conflict = true;
+                }
+                ++local_cnt;
+            }
+        }
+#pragma omp critical(lc_nodata)
+        {
+            total += local_cnt;
+            if (local_bad) bad_label = true;
+            if (local_conflict) conflict = true;
+            if (local_cluster >= 0) {
+                if (cluster < 0) cluster = local_cluster;
+                else if (cluster != local_cluster) conflict = true;
+            }
+        }
+    }
+    if (bad_label) throw std::runtime_error("piksel nodata mendapat label cluster di luar rentang");
+    if (conflict) throw std::runtime_error("piksel nodata (0,0,0) mendapat label cluster berbeda");
+    return {total, total > 0 ? cluster : -1};
+}
+
 void colorize(uint8_t* rgb, const int32_t* labels, size_t n, const uint8_t* centroids, bool parallel) {
     uint8_t pal[KMEANS_MAX_K][3];
     std::memcpy(pal, centroids, sizeof(pal));
@@ -1002,6 +1052,9 @@ int run(const Options& o) {
         uint64_t sum = 0;
         for (int c = 0; c < o.k; ++c) sum += counts[c];
         if (sum != n64) throw std::runtime_error("jumlah counts tidak sama dengan jumlah piksel (galat internal)");
+        const NodataStats nodata = compute_nodata(rgb.get(), labels.get(), n, o.k, par);
+        if (nodata.pixels > 0 && (nodata.cluster < 0 || nodata.cluster >= o.k || nodata.pixels > counts[nodata.cluster]))
+            throw std::runtime_error("jumlah nodata tidak konsisten dengan counts cluster");
 
         const PreviewDims pd = preview_dims(ds.width, ds.height, o.preview_max);
         std::vector<uint8_t> prev_labels, prev_map;
@@ -1072,6 +1125,8 @@ int run(const Options& o) {
         appendf(meta, "  \"init_centroids\": %s,\n", ic.c_str());
         appendf(meta, "  \"preview_width\": %d,\n  \"preview_height\": %d,\n", pd.w, pd.h);
         appendf(meta, "  \"chunks\": %zu,\n  \"labels_written\": %s,\n", ds.chunks.size(), o.write_labels ? "true" : "false");
+        appendf(meta, "  \"nodata_pixels\": %llu,\n  \"nodata_cluster\": %d,\n",
+                static_cast<unsigned long long>(nodata.pixels), nodata.cluster);
         appendf(meta, "  \"cuda_warmup\": %s,\n", (warm.done && warm.rc == 0) ? "true" : "false");
         if (!ds.source.empty()) appendf(meta, "  \"source\": %s,\n", json_str(ds.source).c_str());
         appendf(meta, "  \"host\": %s,\n  \"created_at\": %s\n}\n", json_str(describe_host()).c_str(),

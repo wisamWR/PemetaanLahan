@@ -31,7 +31,7 @@ from PIL import Image
 
 import config
 from landcover.contract import ContractError, read_run, validate
-from landcover.reference_kmeans import init_centroids, kmeans_int
+from landcover.reference_kmeans import init_centroids, kmeans_int, nodata_stats
 
 IMAGE_FORMAT = os.getenv("LC_TEST_IMAGE_FORMAT", "PNG")
 STAGES = ["baca", "inisialisasi", "kmeans", "pewarnaan", "tulis"]
@@ -327,3 +327,52 @@ def test_png_ragam_tipe_warna_didekode_seperti_pillow(core, tmp_path, mode):
     run = read_run(out)
     _, labels, centroids, counts = reference(decoded_rgb(src), 4, 6, 7)
     assert np.array_equal(run.centroids, centroids) and np.array_equal(run.counts, counts)
+
+
+def test_nodata_tanpa_tepi_hitam_mencatat_nol_dan_minus_satu(core, tmp_path):
+    img = np.full((32, 32, 3), (40, 120, 60), dtype=np.uint8)
+    img[:16, :16] = (180, 140, 80)
+    src = save(img, tmp_path / "tanpa_nd.png")
+    out = tmp_path / "o"
+    assert run_core(core, *lc_args(src, out, k=3)).returncode == 0
+    run = read_run(out)
+    assert validate(run) == []
+    assert run.nodata_pixels == 0 and run.nodata_cluster == -1
+
+
+def test_nodata_tepi_hitam_murni_dan_campuran_cocok_referensi(core, info, tmp_path):
+    # Kasus 1: cluster nodata murni (piksel (0,0,0) terpisah jauh dari hijau dan krem).
+    pure = np.full((64, 64, 3), (40, 140, 50), dtype=np.uint8)
+    pure[:, 32:] = (200, 180, 120)
+    pure[:8, :] = 0
+    pure[:, :6] = 0
+
+    # Kasus 2: K=2 dengan (0,0,0), (2,2,2), dan (230,230,230) agar (0,0,0) dan (2,2,2) bergabung di cluster yang sama.
+    mixed = np.full((64, 64, 3), (230, 230, 230), dtype=np.uint8)
+    mixed[:20, :] = (2, 2, 2)
+    mixed[:10, :] = 0
+
+    for name, arr, k in (("murni", pure, 4), ("campuran", mixed, 2)):
+        src = save(arr, tmp_path / f"{name}.png")
+        rgb = decoded_rgb(src)
+        _, labels, _, counts = reference(rgb, k, 6, 7)
+        exp_px, exp_cl = nodata_stats(rgb.reshape(-1, 3), labels)
+        assert exp_px > 0 and 0 <= exp_cl < k
+        if name == "murni":
+            assert exp_px == int(counts[exp_cl])
+        else:
+            assert exp_px < int(counts[exp_cl])
+
+        out_cpu = tmp_path / f"{name}_cpu"
+        assert run_core(core, *lc_args(src, out_cpu, k=k, extra=["--write-labels"])).returncode == 0
+        run_cpu = read_run(out_cpu)
+        assert validate(run_cpu) == []
+        assert (run_cpu.nodata_pixels, run_cpu.nodata_cluster) == (exp_px, exp_cl)
+
+        if info["engines"]["cuda"]:
+            out_cuda = tmp_path / f"{name}_cuda"
+            r = run_core(core, *lc_args(src, out_cuda, mode="opt", k=k, extra=["--kmeans", "cuda", "--write-labels"]))
+            assert r.returncode == 0, r.stderr
+            run_cuda = read_run(out_cuda)
+            assert validate(run_cuda) == []
+            assert (run_cuda.nodata_pixels, run_cuda.nodata_cluster) == (exp_px, exp_cl)

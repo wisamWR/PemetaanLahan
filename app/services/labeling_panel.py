@@ -25,7 +25,7 @@ from PIL import Image
 from landcover.contract import RunResult
 from landcover.export import png_bytes, table_csv_bytes
 from landcover.labeling import (
-    CLASS_PRESETS, TOTAL_LABEL, UNNAMED, ClassMap, _normalized_class_map, area_table,
+    CLASS_PRESETS, NODATA_LABEL, TOTAL_LABEL, UNNAMED, ClassMap, _normalized_class_map, area_table,
     cluster_table, default_class_map, normalize_class_name,
 )
 from landcover.render import class_palette, export_full_res_png, recolor
@@ -98,9 +98,19 @@ def resolve_name(kelas, nama_lain) -> str:
     return normalize_class_name(None if _blank(kelas) else kelas)
 
 
-def editor_frame(counts, centroids, class_map: ClassMap, pixel_size_m: float = DEFAULT_PIXEL_SIZE_M) -> pd.DataFrame:
+def editor_frame(
+    counts,
+    centroids,
+    class_map: ClassMap,
+    pixel_size_m: float = DEFAULT_PIXEL_SIZE_M,
+    *,
+    nodata_pixels: int = 0,
+    nodata_cluster: int = -1,
+) -> pd.DataFrame:
     """Isi awal editor: satu baris per cluster, kolom `EDITOR_COLUMNS`, dtype stabil."""
-    table = cluster_table(counts, centroids, pixel_size_m)
+    table = cluster_table(
+        counts, centroids, pixel_size_m, nodata_pixels=nodata_pixels, nodata_cluster=nodata_cluster
+    )
     names = _normalized_class_map(class_map, len(table))
     split = [split_name(names[i]) for i in range(len(table))]
     return pd.DataFrame(
@@ -148,8 +158,8 @@ class Summary:
 
 
 def summary_of(area: pd.DataFrame) -> Summary:
-    """Ringkasan dari `area_table` (baris `Total` dan `UNNAMED` diperlakukan khusus)."""
-    body = area[area["kelas"] != TOTAL_LABEL]
+    """Ringkasan dari `area_table` (baris `Total`, `NODATA_LABEL`, dan `UNNAMED` diperlakukan khusus)."""
+    body = area[(area["kelas"] != TOTAL_LABEL) & (area["kelas"] != NODATA_LABEL)]
     named = body[body["kelas"] != UNNAMED]
     unnamed = body[body["kelas"] == UNNAMED]
     total_ha = float(area.loc[area["kelas"] == TOTAL_LABEL, "luas_ha"].iloc[0])
@@ -190,11 +200,34 @@ def class_map_png(run: RunResult, class_map: ClassMap) -> bytes:
 
 
 def area_csv(run: RunResult, class_map: ClassMap) -> bytes:
-    return table_csv_bytes(area_table(run.counts, class_map, pixel_size_of(run)[0]))
+    return table_csv_bytes(
+        area_table(
+            run.counts, class_map, pixel_size_of(run)[0],
+            nodata_pixels=run.nodata_pixels, nodata_cluster=run.nodata_cluster,
+        )
+    )
 
 
 def cluster_csv(run: RunResult) -> bytes:
-    return table_csv_bytes(cluster_table(run.counts, run.centroids, pixel_size_of(run)[0]))
+    return table_csv_bytes(
+        cluster_table(
+            run.counts, run.centroids, pixel_size_of(run)[0],
+            nodata_pixels=run.nodata_pixels, nodata_cluster=run.nodata_cluster,
+        )
+    )
+
+
+def nodata_percent(nodata_pixels: int, total_pixels: int) -> float:
+    if nodata_pixels <= 0 or total_pixels <= 0:
+        return 0.0
+    return float(nodata_pixels) * 100.0 / float(total_pixels)
+
+
+def nodata_note(nodata_pixels: int, total_pixels: int) -> str | None:
+    if nodata_pixels <= 0:
+        return None
+    pct = nodata_percent(nodata_pixels, total_pixels)
+    return f"{nodata_pixels:,} piksel nodata ({pct:.2f}%) dikecualikan dari luas"
 
 
 def labels_file_of(run: RunResult) -> Path | None:
@@ -242,8 +275,13 @@ def preview_caption(run: RunResult) -> str:
     )
 
 
-def area_caption(size: float, note: str | None) -> str:
-    text = f"Persen dari seluruh piksel (counts); luas dihitung dengan {size:g} m per piksel."
+def area_caption(size: float, note: str | None, *, has_nodata: bool = False) -> str:
+    base = (
+        "Persen dari piksel valid (nodata (0,0,0) dikecualikan)"
+        if has_nodata
+        else "Persen dari seluruh piksel (counts)"
+    )
+    text = f"{base}; luas dihitung dengan {size:g} m per piksel."
     return f"{text} {note}" if note else text
 
 
@@ -367,7 +405,8 @@ def export_items(run: RunResult) -> list[dict]:
 
 
 __all__ = [
-    "HELP_CLASS", "HELP_OTHER", "HELP_PANEL", "area_caption", "export_note", "preview_caption",
+    "HELP_CLASS", "HELP_OTHER", "HELP_PANEL", "NODATA_LABEL", "area_caption", "export_note", "nodata_note",
+    "nodata_percent", "preview_caption",
     "CLUSTER_ERROR", "COL_CLASS", "COL_CLUSTER", "COL_COLOR", "COL_OTHER", "COL_PERCENT", "COL_PIXELS",
     "DEFAULT_PIXEL_SIZE_M", "EDITOR_COLUMNS", "EXPORT_KINDS", "EXPORT_LABELS", "EXPORT_MEDIA_TYPES",
     "KEY_EDITOR_PREFIX", "LABELS_FILE", "MOCK_FILE_PREFIX", "NAME_MAX_CHARS", "READ_ONLY_COLUMNS",

@@ -421,3 +421,23 @@ def test_params_dipakai_apa_adanya_bukan_dimodifikasi(launcher, tmp_path):
     before = replace(p)
     launcher.run(p, tmp_path / "r")
     assert p == before
+
+
+def test_nodata_tepi_hitam_pada_mock_launcher(data_dir, runs_dir):
+    # Citra kecil <= max_side (tanpa resize): nodata_pixels dan nodata_cluster persis.
+    img = np.full((32, 32, 3), (40, 140, 60), dtype=np.uint8)
+    img[:4, :] = 0
+    img[:, :4] = 0
+    expected_nd = int(((img[:, :, 0] == 0) & (img[:, :, 1] == 0) & (img[:, :, 2] == 0)).sum())
+    Image.fromarray(img).save(data_dir / "tepi_hitam.png")
+
+    launcher = MockLauncher(data_dir, max_side=512)
+    _, _, run = do_run(launcher, runs_dir, dataset="tepi_hitam", k=3)
+    assert validate(run) == []
+    assert run.nodata_pixels == expected_nd
+    assert 0 <= run.nodata_cluster < 3 and run.counts[run.nodata_cluster] == expected_nd
+
+    # break_verification pada citra ber-nodata tetap lolos validate()
+    broken = MockLauncher(data_dir, max_side=512, break_verification=True)
+    _, _, bad = do_run(broken, runs_dir / "brk", dataset="tepi_hitam", k=3)
+    assert validate(bad) == []

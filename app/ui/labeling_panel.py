@@ -66,6 +66,7 @@ from services.labeling_panel import (
     format_ha,
     format_percent,
     labels_file_of,
+    nodata_note,
     pixel_size_of,
     resolve_name,
     split_name,
@@ -169,7 +170,10 @@ def render_labeling_panel(run: RunResult, class_map: ClassMap) -> bool:
         st.caption(size_note)
 
     try:
-        frame = editor_frame(run.counts, run.centroids, class_map, size)
+        frame = editor_frame(
+            run.counts, run.centroids, class_map, size,
+            nodata_pixels=run.nodata_pixels, nodata_cluster=run.nodata_cluster,
+        )
     except ValueError as exc:          # hasil janggal: counts/centroid tidak cocok, atau state basi
         st.error(f"Panel pelabelan tidak bisa dibuat untuk hasil ini: {exc}")
         return False
@@ -187,8 +191,14 @@ def render_labeling_panel(run: RunResult, class_map: ClassMap) -> bool:
     for message in errors:
         st.error(message)
 
-    area = area_table(run.counts, class_map, size)
+    area = area_table(
+        run.counts, class_map, size,
+        nodata_pixels=run.nodata_pixels, nodata_cluster=run.nodata_cluster,
+    )
     summary = summary_of(area)
+    nd_msg = nodata_note(run.nodata_pixels, int(run.counts.sum()))
+    if nd_msg:
+        st.info(nd_msg)
     st.markdown("**Luas per kelas**")
     # Dua baris dua kolom: nilai metrik tidak membungkus, jadi "1,205,604.00 ha" terpotong bila
     # empat metrik berdesakan dalam satu baris (terlihat di browser).

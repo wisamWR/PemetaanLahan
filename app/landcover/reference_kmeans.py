@@ -172,3 +172,23 @@ def kmeans_int(
         nonempty = counts > 0                        # cluster kosong: centroid tetap
         cen[nonempty] = sums[nonempty] // counts[nonempty][:, None]
     return labels, cen, np.bincount(labels, minlength=k).astype(np.int64)
+
+
+def nodata_stats(pixels: np.ndarray, labels: np.ndarray) -> tuple[int, int]:
+    """Hitung piksel nodata `(0, 0, 0)` dan id cluster-nya (`-1` bila tidak ada).
+
+    Memastikan semua piksel `(0, 0, 0)` mendapat label yang sama (aturan determinisme U7).
+    """
+    px = _as_pixels(pixels)
+    lab = np.asarray(labels)
+    if lab.ndim != 1 or len(lab) != len(px):
+        raise ValueError(f"labels harus 1-D sepanjang {len(px)}, ditemukan {lab.shape}")
+    mask = (px[:, 0] == 0) & (px[:, 1] == 0) & (px[:, 2] == 0)
+    nodata_pixels = int(mask.sum())
+    if nodata_pixels == 0:
+        return 0, -1
+    nodata_labels = lab[mask]
+    lo, hi = int(nodata_labels.min()), int(nodata_labels.max())
+    if lo != hi:
+        raise ValueError(f"piksel nodata (0,0,0) mendapat label berbeda: {lo} vs {hi}")
+    return nodata_pixels, lo

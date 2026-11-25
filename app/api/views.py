@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from typing import Any, Mapping
 
 from landcover.contract import STAGES, RunResult, validate
-from landcover.labeling import CLASS_PRESETS, TOTAL_LABEL, UNNAMED, ClassMap, area_table, cluster_table
+from landcover.labeling import CLASS_PRESETS, NODATA_LABEL, TOTAL_LABEL, UNNAMED, ClassMap, area_table, cluster_table
 from landcover.reference_kmeans import KMEANS_MAX_K, MAX_SEED
 from landcover.verify import Verification
 from launchers.base import KMEANS_CHOICES, MODES
@@ -33,6 +33,8 @@ from services.labeling_panel import (
     format_ha,
     format_percent,
     names_of,
+    nodata_note,
+    nodata_percent,
     palette_hex,
     pixel_size_of,
     preview_caption,
@@ -289,18 +291,27 @@ def area_payload(run: RunResult, class_map: ClassMap, errors: list[str], created
     `counts` tidak cocok); pemanggil memetakannya ke 422."""
     size, size_note = pixel_size_of(run)
     k = run.k
-    area = area_table(run.counts, class_map, size)
-    clusters = cluster_table(run.counts, run.centroids, size)
+    nd_pixels, nd_cluster = run.nodata_pixels, run.nodata_cluster
+    area = area_table(run.counts, class_map, size, nodata_pixels=nd_pixels, nodata_cluster=nd_cluster)
+    clusters = cluster_table(run.counts, run.centroids, size, nodata_pixels=nd_pixels, nodata_cluster=nd_cluster)
     summary = summary_of(area)
     names = names_of(class_map, k)
     class_hex = palette_hex(run, class_map)
     centroid = centroid_hex(run)
     invalid = cluster_error_ids(errors)
+    pure_nodata = nd_cluster if (nd_pixels > 0 and int(run.counts[nd_cluster]) == nd_pixels) else None
 
     cluster_rows = []
     for idx in range(k):
         row = clusters.iloc[idx]
         kelas, other = split_name(names[idx])
+        is_nd_cluster = nd_pixels > 0 and idx == nd_cluster
+        all_nodata = idx == pure_nodata
+        nodata_badge = (
+            "Seluruhnya nodata"
+            if all_nodata
+            else (f"Memuat {nd_pixels:,} piksel nodata" if is_nd_cluster else None)
+        )
         cluster_rows.append({
             "cluster": idx,
             "centroid_hex": centroid[idx],
@@ -316,17 +327,23 @@ def area_payload(run: RunResult, class_map: ClassMap, errors: list[str], created
             "area_ha": float(row["luas_ha"]),
             "area_text": format_ha(float(row["luas_ha"])),
             "invalid": idx in invalid,
+            "all_nodata": all_nodata,
+            "nodata_pixels": nd_pixels if is_nd_cluster else 0,
+            "nodata_badge": nodata_badge,
         })
 
     members: dict[str, list[int]] = {}
     for idx, name in enumerate(names):
+        if idx == pure_nodata:
+            continue
         members.setdefault(name, []).append(idx)
     area_rows = []
     for _, row in area.iterrows():
         name = str(row["kelas"])
         is_total = name == TOTAL_LABEL
-        ids = [] if is_total else members.get(name, [])
-        if is_total:
+        is_nodata = name == NODATA_LABEL
+        ids = [] if is_total else ([nd_cluster] if is_nodata else members.get(name, []))
+        if is_total or is_nodata:
             colors: list[str] = []
         elif name == UNNAMED:                 # beberapa cluster tanpa nama: tiap cluster memakai warna centroid
             colors = [centroid[i] for i in ids]
@@ -339,6 +356,7 @@ def area_payload(run: RunResult, class_map: ClassMap, errors: list[str], created
             "colors": colors,
             "unnamed": name == UNNAMED,
             "is_total": is_total,
+            "is_nodata": is_nodata,
             "pixels": int(row["piksel"]),
             "pixels_text": f"{int(row['piksel']):,}",
             "percent": float(row["persen"]),
@@ -347,12 +365,23 @@ def area_payload(run: RunResult, class_map: ClassMap, errors: list[str], created
             "area_text": format_ha(float(row["luas_ha"])),
         })
 
-    n_pixels = int(run.counts.sum())
+    total_all = int(run.counts.sum())
+    valid_total = total_all - nd_pixels
+    total_caption = (
+        f"{valid_total:,} piksel valid ({nd_pixels:,} nodata dikecualikan) · {size:g} m per piksel"
+        if nd_pixels > 0
+        else f"{total_all:,} piksel · {size:g} m per piksel"
+    )
+    named_caption = (
+        f"dari {k - 1} cluster valid (1 nodata)"
+        if pure_nodata is not None
+        else f"dari {k} cluster"
+    )
     kpis = [
         {"key": "total", "label": "Luas total", "value": format_ha(summary.total_ha),
-         "caption": f"{n_pixels:,} piksel · {size:g} m per piksel"},
+         "caption": total_caption},
         {"key": "named", "label": "Kelas bernama", "value": str(summary.named_classes),
-         "caption": f"dari {k} cluster"},
+         "caption": named_caption},
         {"key": "largest", "label": "Kelas terbesar",
          "value": "Belum ada" if summary.largest is None else f"{summary.largest[0]} ({summary.largest[1]:.1f} %)",
          "caption": "Beri nama cluster untuk melihatnya." if summary.largest is None else "Dari kelas yang sudah diberi nama."},
@@ -374,6 +403,13 @@ def area_payload(run: RunResult, class_map: ClassMap, errors: list[str], created
         "presets": list(CLASS_PRESETS),
         "unnamed_label": UNNAMED,
         "total_label": TOTAL_LABEL,
+        "nodata_label": NODATA_LABEL,
+        "nodata": {
+            "pixels": nd_pixels,
+            "cluster": nd_cluster,
+            "percent": num(nodata_percent(nd_pixels, total_all)),
+            "note": nodata_note(nd_pixels, total_all),
+        },
         "name_max_chars": NAME_MAX_CHARS,
         "names": names,
         "palette": class_hex,
@@ -383,7 +419,7 @@ def area_payload(run: RunResult, class_map: ClassMap, errors: list[str], created
         "errors": list(errors),
         "help": {"panel": HELP_PANEL, "other": HELP_OTHER, "kelas": HELP_CLASS},
         "preview_caption": preview_caption(run),
-        "area_caption": area_caption(size, size_note),
+        "area_caption": area_caption(size, size_note, has_nodata=nd_pixels > 0),
         "exports": export_items(run),
         "export_note": export_note(run),
     }

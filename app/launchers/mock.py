@@ -30,7 +30,7 @@ import numpy as np
 from PIL import Image
 
 from landcover.datasets import KIND_PNG, resolve_dataset
-from landcover.reference_kmeans import init_centroids, kmeans_int
+from landcover.reference_kmeans import init_centroids, kmeans_int, nodata_stats
 
 from .base import ProgressCallback, RunParams, run_id
 
@@ -299,13 +299,27 @@ class MockLauncher:
         # K-Means pada pratinjau: tidak bergantung pada mode, kmeans, atau thread.
         pixels = small.reshape(-1, 3)
         init = init_centroids(pixels, params.k, params.seed)
-        labels, centroids, counts_small = kmeans_int(pixels, init, params.iters)
-        labels = labels.reshape(sh, sw)
+        labels_flat, centroids, counts_small = kmeans_int(pixels, init, params.iters)
+        nodata_small, nodata_cluster = nodata_stats(pixels, labels_flat)
+        labels = labels_flat.reshape(sh, sw)
 
         if self.break_verification and params.mode == "opt":
             labels = self._break_labels(labels, params.k, rid)
             counts_small = np.bincount(labels.ravel(), minlength=params.k).astype(np.int64)
         counts = scale_counts(counts_small, n_pixels)
+        if nodata_small == 0:
+            nodata_pixels = 0
+        else:
+            cluster_total = int(counts[nodata_cluster])
+            if n_pixels == len(pixels):
+                nodata_pixels = min(nodata_small, cluster_total)
+            elif nodata_small == int(counts_small[nodata_cluster]):
+                nodata_pixels = cluster_total
+            else:
+                scaled_nd = nodata_small * n_pixels // len(pixels)
+                nodata_pixels = min(cluster_total, max(1, scaled_nd)) if cluster_total > 0 else 0
+            if nodata_pixels == 0:
+                nodata_cluster = -1
         colors = centroids[labels].astype(np.uint8)
 
         timing = fake_timing(params, device, width, height, rid)
@@ -334,6 +348,8 @@ class MockLauncher:
             "init_centroids": init.tolist(),
             "preview_width": sw,
             "preview_height": sh,
+            "nodata_pixels": nodata_pixels,
+            "nodata_cluster": nodata_cluster,
             "source_image": source,
             "host": "tiruan (mock): waktu dari model biaya, bukan hasil ukur",
             "created_at": datetime.now().astimezone().isoformat(timespec="seconds"),
