@@ -88,10 +88,19 @@ constexpr int kExitUsage = 2;
 constexpr int kExitEngine = 3;
 
 // Ambang --kmeans auto, dari pengukuran bench/run_bench.py (#10) di RTX 3050 Laptop + i7-13620H
-// (bench/results/bench_gpu_*.csv, sweep_gpu_*.csv): mulai 0,10 juta piksel (320x320) CUDA jelas
-// menang atas omp terbaik (5,7 vs 11,2 ms) sampai 33 juta piksel. Pada 0,04 juta (200x200) selisihnya
-// sekitar 1 ms, masih dalam derau, jadi di bawah ambang tetap omp. Ukur ulang bila mesin uji berubah.
-constexpr uint64_t kAutoCudaThresholdPixels = 100000ULL;
+// (bench/results/ambang_summary.csv; penurunan: bench/fit_auto_threshold.py, docs/AMBANG_AUTO.md).
+// Yang dibandingkan adalah waktu dinding satu proses CLI ("Proses" di docs/BENCH_tabel.md), sebab
+// tiap run menjalankan landcover baru dan inisialisasi konteks CUDA (+-250 ms, tidak masuk total_ms)
+// dirasakan pengguna. K-Means omp tumbuh sebanding N*K, sedangkan CUDA hampir tidak bergantung K,
+// jadi titik impas ditentukan oleh N*K (piksel x cluster), bukan N saja:
+//   cuda dipilih bila N*K >= kAutoCudaThresholdWork.
+// Pada 21 konfigurasi terukur (N 0,1-12 juta, K 4/8/16) aturan ini memilih mesin tercepat di
+// semuanya (T mana pun 66-72 juta memberi hasil sama); ambang lama (N >= 0,1 juta) benar 5 dari 21
+// karena hanya memakai Total tanpa pemanasan CUDA. Ukur ulang bila mesin uji berubah.
+constexpr uint64_t kAutoCudaThresholdWork = 70000000ULL;
+// Padanan dalam piksel pada K bawaan (8), untuk --info (kunci auto_cuda_threshold_pixels).
+constexpr int kAutoDefaultK = 8;
+constexpr uint64_t kAutoCudaThresholdPixels = kAutoCudaThresholdWork / kAutoDefaultK;
 
 constexpr int kContractVersion = 1;
 
@@ -543,11 +552,14 @@ Engine select_engine(const Options& o, uint64_t n) {
             throw EngineError("--kmeans omp: kmeans_omp tidak terhubung pada build ini (src/omp/*.cpp belum ada saat make landcover)");
         return omp_engine();
     }
-    // auto
-    const std::string basis = "N = " + juta_text(n) + " juta piksel";
-    const std::string limit = juta_text(kAutoCudaThresholdPixels) + " juta (hasil benchmark #10)";
+    // auto: N*K (piksel x cluster) dibandingkan dengan ambang kerja
+    const uint64_t work = n * static_cast<uint64_t>(o.k);
+    const bool want_cuda = work >= kAutoCudaThresholdWork;
+    const std::string basis = "N = " + juta_text(n) + " juta piksel x K = " + std::to_string(o.k) +
+                              " = " + juta_text(work) + " juta";
+    const std::string limit = juta_text(kAutoCudaThresholdWork) + " juta piksel x cluster (hasil benchmark #10)";
     Engine e;
-    if (n >= kAutoCudaThresholdPixels) {
+    if (want_cuda) {
         if (have_cuda) {
             e = cuda_engine();
             e.reason = basis + " >= ambang " + limit;
@@ -564,7 +576,7 @@ Engine select_engine(const Options& o, uint64_t n) {
         return e;
     }
     e = serial_engine();
-    e.reason = basis + (n >= kAutoCudaThresholdPixels ? " >= " : " < ") + "ambang " + limit +
+    e.reason = basis + (want_cuda ? " >= " : " < ") + "ambang " + limit +
                ", tetapi kmeans_omp dan kmeans_cuda tidak terhubung pada build ini; jatuh ke serial";
     return e;
 }
@@ -957,7 +969,8 @@ void print_info() {
     appendf(s, "    \"cpu\": %s,\n", cpu ? json_str(cpu).c_str() : "null");
     appendf(s, "    \"omp\": %s,\n", kmeans_omp != nullptr ? "true" : "false");
     appendf(s, "    \"cuda\": %s\n  },\n", kmeans_cuda != nullptr ? "true" : "false");
-    appendf(s, "  \"auto_cuda_threshold_pixels\": %llu\n}\n", static_cast<unsigned long long>(kAutoCudaThresholdPixels));
+    appendf(s, "  \"auto_cuda_threshold_pixels\": %llu,\n", static_cast<unsigned long long>(kAutoCudaThresholdPixels));
+    appendf(s, "  \"auto_cuda_threshold_work\": %llu\n}\n", static_cast<unsigned long long>(kAutoCudaThresholdWork));
     std::fputs(s.c_str(), stdout);
     std::fflush(stdout);
 }
