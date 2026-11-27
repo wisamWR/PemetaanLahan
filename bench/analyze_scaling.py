@@ -54,7 +54,14 @@ def load(paths):
                 r["px"] = r["width"] * r["height"]
                 r["src"] = os.path.basename(p)
                 rows.append(r)
-    return rows
+    # Baris ganda (konfigurasi sama di beberapa CSV): yang terakhir menang, sesuai petunjuk di atas.
+    uniq = {}
+    for r in rows:
+        uniq[(r["group"], r["config"], r["image"], r["width"], r["height"], r["k"])] = r
+    dropped = len(rows) - len(uniq)
+    if dropped:
+        print("[info] %d baris ganda dibuang (yang terakhir dipakai)." % dropped)
+    return list(uniq.values())
 
 
 def idx(rows):
