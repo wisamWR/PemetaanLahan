@@ -1,0 +1,57 @@
+config,group,mode,image,width,height,k,iters,threads,read_ms,init_ms,kmeans_ms,color_ms,write_ms,total_ms,h2d_ms,kernel_ms,d2h_ms,io_threads,reps,speedup_total_vs_L0,efisiensi,identik,acuan
+L0,strong,cpu,sintetis_lanskap_1000x1000,1000,1000,8,20,1,13.197,0.000,207.470,0.704,17.425,237.414,0.000,0.000,0.000,1,5,1.000,belum diukur,ya,L0
+L2 omp x1,strong,omp,sintetis_lanskap_1000x1000,1000,1000,8,20,1,13.461,0.000,220.673,0.766,17.033,252.430,0.000,0.000,0.000,1,5,0.941,1.000,ya,L0
+L2 omp x2,strong,omp,sintetis_lanskap_1000x1000,1000,1000,8,20,2,14.548,0.000,134.459,0.611,14.399,164.060,0.000,0.000,0.000,2,5,1.447,0.769,ya,L0
+L2 omp x4,strong,omp,sintetis_lanskap_1000x1000,1000,1000,8,20,4,13.572,0.000,53.840,0.437,13.601,82.929,0.000,0.000,0.000,4,5,2.863,0.761,ya,L0
+L2 omp x8,strong,omp,sintetis_lanskap_1000x1000,1000,1000,8,20,8,13.758,0.000,43.492,0.416,15.717,73.668,0.000,0.000,0.000,8,5,3.223,0.428,ya,L0
+L2 omp x16,strong,omp,sintetis_lanskap_1000x1000,1000,1000,8,20,16,13.887,0.000,94.500,4.752,24.471,132.940,0.000,0.000,0.000,16,5,1.786,0.119,ya,L0
+L1 cuda,strong,cuda,sintetis_lanskap_1000x1000,1000,1000,8,20,0,14.290,0.001,4.841,0.717,16.564,37.399,0.755,2.129,2.036,1,5,6.348,belum diukur,ya,L0
+L1+L2 cuda x2,strong,cuda,sintetis_lanskap_1000x1000,1000,1000,8,20,0,13.300,0.001,5.107,0.615,12.071,34.470,0.883,2.176,2.095,2,5,6.888,belum diukur,ya,L0
+L1+L2 cuda x4,strong,cuda,sintetis_lanskap_1000x1000,1000,1000,8,20,0,13.981,0.001,4.962,0.527,15.095,43.815,0.768,2.127,2.010,4,5,5.419,belum diukur,ya,L0
+L1+L2 cuda x8,strong,cuda,sintetis_lanskap_1000x1000,1000,1000,8,20,0,13.185,0.001,5.089,0.539,16.076,37.330,0.694,2.133,2.124,8,5,6.360,belum diukur,ya,L0
+L1+L2 cuda x16,strong,cuda,sintetis_lanskap_1000x1000,1000,1000,8,20,0,13.296,0.001,4.958,2.886,25.532,48.702,0.678,2.131,2.055,16,5,4.875,belum diukur,ya,L0
+L0,strong,cpu,sintetis_lanskap_2000x2000,2000,2000,8,20,1,52.915,0.000,777.367,4.007,85.839,921.743,0.000,0.000,0.000,1,5,1.000,belum diukur,ya,L0
+L2 omp x1,strong,omp,sintetis_lanskap_2000x2000,2000,2000,8,20,1,54.160,0.000,819.479,3.405,84.524,960.910,0.000,0.000,0.000,1,5,0.959,1.000,ya,L0
+L2 omp x2,strong,omp,sintetis_lanskap_2000x2000,2000,2000,8,20,2,53.566,0.000,365.915,2.492,44.895,476.985,0.000,0.000,0.000,2,5,1.932,1.007,ya,L0
+L2 omp x4,strong,omp,sintetis_lanskap_2000x2000,2000,2000,8,20,4,52.664,0.000,215.294,2.299,34.040,312.378,0.000,0.000,0.000,4,5,2.951,0.769,ya,L0
+L2 omp x8,strong,omp,sintetis_lanskap_2000x2000,2000,2000,8,20,8,52.324,0.000,165.010,1.984,23.627,245.058,0.000,0.000,0.000,8,5,3.761,0.490,ya,L0
+L2 omp x16,strong,omp,sintetis_lanskap_2000x2000,2000,2000,8,20,16,57.905,0.000,321.372,15.140,45.201,444.090,0.000,0.000,0.000,16,5,2.076,0.135,ya,L0
+L1 cuda,strong,cuda,sintetis_lanskap_2000x2000,2000,2000,8,20,0,52.424,0.001,18.542,3.510,82.027,159.486,2.931,7.678,7.990,1,5,5.779,belum diukur,ya,L0
+L1+L2 cuda x2,strong,cuda,sintetis_lanskap_2000x2000,2000,2000,8,20,0,52.929,0.001,16.965,2.265,45.182,119.067,2.198,7.682,7.058,2,5,7.741,belum diukur,ya,L0
+L1+L2 cuda x4,strong,cuda,sintetis_lanskap_2000x2000,2000,2000,8,20,0,52.086,0.001,17.901,2.028,34.346,112.677,2.386,7.672,7.844,4,5,8.180,belum diukur,ya,L0
+L1+L2 cuda x8,strong,cuda,sintetis_lanskap_2000x2000,2000,2000,8,20,0,56.438,0.002,23.342,2.302,27.720,116.514,3.846,7.687,11.253,8,5,7.911,belum diukur,ya,L0
+L1+L2 cuda x16,strong,cuda,sintetis_lanskap_2000x2000,2000,2000,8,20,0,57.234,0.001,20.926,11.383,39.758,126.167,3.033,7.671,10.199,16,5,7.306,belum diukur,ya,L0
+L0,strong,cpu,sintetis_lanskap_4000x3000,4000,3000,8,20,1,169.246,0.000,2230.944,11.548,207.380,2603.202,0.000,0.000,0.000,1,5,1.000,belum diukur,ya,L0
+L2 omp x1,strong,omp,sintetis_lanskap_4000x3000,4000,3000,8,20,1,159.336,0.000,2289.425,10.594,205.245,2672.500,0.000,0.000,0.000,1,5,0.974,1.000,ya,L0
+L2 omp x2,strong,omp,sintetis_lanskap_4000x3000,4000,3000,8,20,2,161.490,0.000,1083.492,7.618,113.282,1371.405,0.000,0.000,0.000,2,5,1.898,0.974,ya,L0
+L2 omp x4,strong,omp,sintetis_lanskap_4000x3000,4000,3000,8,20,4,160.578,0.000,686.626,6.543,73.690,928.089,0.000,0.000,0.000,4,5,2.805,0.720,ya,L0
+L2 omp x8,strong,omp,sintetis_lanskap_4000x3000,4000,3000,8,20,8,156.356,0.000,477.836,6.055,51.179,690.148,0.000,0.000,0.000,8,5,3.772,0.484,ya,L0
+L2 omp x16,strong,omp,sintetis_lanskap_4000x3000,4000,3000,8,20,16,172.791,0.000,539.428,11.100,61.742,775.048,0.000,0.000,0.000,16,5,3.359,0.216,ya,L0
+L1 cuda,strong,cuda,sintetis_lanskap_4000x3000,4000,3000,8,20,0,156.279,0.001,50.463,9.223,200.079,419.681,6.665,23.355,20.797,1,5,6.203,belum diukur,ya,L0
+L1+L2 cuda x2,strong,cuda,sintetis_lanskap_4000x3000,4000,3000,8,20,0,157.153,0.001,53.928,7.805,110.215,327.755,7.014,23.346,21.993,2,5,7.943,belum diukur,ya,L0
+L1+L2 cuda x4,strong,cuda,sintetis_lanskap_4000x3000,4000,3000,8,20,0,169.828,0.002,56.632,6.019,81.339,324.851,8.925,23.363,24.941,4,5,8.014,belum diukur,ya,L0
+L1+L2 cuda x8,strong,cuda,sintetis_lanskap_4000x3000,4000,3000,8,20,0,158.832,0.001,52.707,6.814,59.950,281.209,7.898,23.361,22.032,8,5,9.257,belum diukur,ya,L0
+L1+L2 cuda x16,strong,cuda,sintetis_lanskap_4000x3000,4000,3000,8,20,0,167.829,0.002,57.455,10.179,59.986,300.694,7.984,23.340,27.271,16,5,8.657,belum diukur,ya,L0
+L0,strong,cpu,sintetis_lanskap_7680x4320,7680,4320,8,20,1,431.265,0.000,5870.616,23.980,419.336,6765.674,0.000,0.000,0.000,1,5,1.000,belum diukur,ya,L0
+L2 omp x1,strong,omp,sintetis_lanskap_7680x4320,7680,4320,8,20,1,451.388,0.000,6133.381,30.253,425.927,7093.176,0.000,0.000,0.000,1,5,0.954,1.000,ya,L0
+L2 omp x2,strong,omp,sintetis_lanskap_7680x4320,7680,4320,8,20,2,441.448,0.000,2980.565,20.357,226.518,3717.761,0.000,0.000,0.000,2,5,1.820,0.954,ya,L0
+L2 omp x4,strong,omp,sintetis_lanskap_7680x4320,7680,4320,8,20,4,449.486,0.000,2025.237,17.856,132.807,2661.072,0.000,0.000,0.000,4,5,2.542,0.666,ya,L0
+L2 omp x8,strong,omp,sintetis_lanskap_7680x4320,7680,4320,8,20,8,457.427,0.000,1257.973,17.648,93.900,1875.938,0.000,0.000,0.000,8,5,3.607,0.473,ya,L0
+L2 omp x16,strong,omp,sintetis_lanskap_7680x4320,7680,4320,8,20,16,457.925,0.000,1414.119,28.041,104.718,2031.788,0.000,0.000,0.000,16,5,3.330,0.218,ya,L0
+L1 cuda,strong,cuda,sintetis_lanskap_7680x4320,7680,4320,8,20,0,439.987,0.001,138.910,26.494,411.294,1033.147,21.585,53.661,62.093,1,5,6.549,belum diukur,ya,L0
+L1+L2 cuda x2,strong,cuda,sintetis_lanskap_7680x4320,7680,4320,8,20,0,434.849,0.002,161.991,19.926,215.296,858.827,22.981,66.563,74.635,2,5,7.878,belum diukur,ya,L0
+L1+L2 cuda x4,strong,cuda,sintetis_lanskap_7680x4320,7680,4320,8,20,0,455.209,0.001,148.498,17.166,132.909,764.285,22.727,54.071,59.491,4,5,8.852,belum diukur,ya,L0
+L1+L2 cuda x8,strong,cuda,sintetis_lanskap_7680x4320,7680,4320,8,20,0,462.604,0.002,160.973,16.232,95.134,738.927,27.777,70.515,59.144,8,5,9.156,belum diukur,ya,L0
+L1+L2 cuda x16,strong,cuda,sintetis_lanskap_7680x4320,7680,4320,8,20,0,435.576,0.001,131.760,18.571,88.004,684.052,19.722,53.237,61.789,16,5,9.891,belum diukur,ya,L0
+bench_cuda simple,cuda_variants,cuda,synthetic_random,1000,1000,8,20,0,0.000,0.001,39.413,0.000,0.000,39.451,0.683,37.657,1.117,0,5,belum diukur,belum diukur,tidak dicek,-
+bench_cuda simple,cuda_variants,cuda,synthetic_random,2000,2000,8,20,0,0.000,0.001,154.090,0.000,0.000,149.564,2.489,148.271,3.244,0,5,belum diukur,belum diukur,tidak dicek,-
+bench_cuda simple,cuda_variants,cuda,synthetic_random,4000,3000,8,20,0,0.000,0.002,462.703,0.000,0.000,446.703,7.292,443.701,10.407,0,5,belum diukur,belum diukur,tidak dicek,-
+bench_cuda simple,cuda_variants,cuda,synthetic_random,7680,4320,8,20,0,0.000,0.001,1282.426,0.000,0.000,1237.215,19.782,1234.667,26.582,0,5,belum diukur,belum diukur,tidak dicek,-
+bench_cuda shared,cuda_variants,cuda,synthetic_random,1000,1000,8,20,0,0.000,0.000,2.795,0.000,0.000,4.119,0.556,1.120,1.033,0,5,belum diukur,belum diukur,tidak dicek,-
+bench_cuda shared,cuda_variants,cuda,synthetic_random,2000,2000,8,20,0,0.000,0.001,9.661,0.000,0.000,10.834,2.424,3.963,2.983,0,5,belum diukur,belum diukur,tidak dicek,-
+bench_cuda shared,cuda_variants,cuda,synthetic_random,4000,3000,8,20,0,0.000,0.002,32.659,0.000,0.000,35.623,8.551,11.769,12.207,0,5,belum diukur,belum diukur,tidak dicek,-
+bench_cuda shared,cuda_variants,cuda,synthetic_random,7680,4320,8,20,0,0.000,0.001,83.447,0.000,0.000,87.834,21.321,33.585,27.813,0,5,belum diukur,belum diukur,tidak dicek,-
+bench_cuda streams,cuda_variants,cuda_streams,synthetic_random,1000,1000,8,20,0,0.000,0.001,3.433,0.000,0.000,13.811,1.181,1.002,1.247,0,5,belum diukur,belum diukur,tidak dicek,-
+bench_cuda streams,cuda_variants,cuda_streams,synthetic_random,2000,2000,8,20,0,0.000,0.001,11.614,0.000,0.000,28.253,3.848,3.486,4.287,0,5,belum diukur,belum diukur,tidak dicek,-
+bench_cuda streams,cuda_variants,cuda_streams,synthetic_random,4000,3000,8,20,0,0.000,0.001,34.492,0.000,0.000,56.700,11.014,10.226,13.406,0,5,belum diukur,belum diukur,tidak dicek,-
+bench_cuda streams,cuda_variants,cuda_streams,synthetic_random,7680,4320,8,20,0,0.000,0.001,91.145,0.000,0.000,112.556,26.475,29.013,34.977,0,5,belum diukur,belum diukur,tidak dicek,-

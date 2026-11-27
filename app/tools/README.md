@@ -58,5 +58,5 @@ Catatan:
   `--runs-dir` di `\\wsl$\Ubuntu-24.04\home\<nama>\...` atau jalankan dari dalam WSL.
 - **Batas waktu.** Mematikan pembungkus (mis. karena batas waktu `CliLauncher`, `LC_CORE_TIMEOUT`) tidak mematikan
   proses `landcover` di dalam WSL; proses itu selesai sendiri.
-- **Mode Optimalisasi dan `auto`.** `--kmeans auto` memilih CUDA hanya bila citra ≥ 8 juta piksel (ambang sementara);
-  citra yang lebih kecil, mis. 2048², dijalankan serial. Pilih K-Means "CUDA" di halaman Kinerja untuk memaksa.
+- **Mode Optimalisasi dan `auto`.** `--kmeans auto` memilih CUDA bila citra ≥ 0,1 juta piksel (100.000;
+  dari benchmark #10, `bench/BENCH_GPU.md`) dan CUDA terhubung; selain itu omp, lalu serial. Pilih K-Means "CUDA" di halaman Kinerja untuk memaksa.

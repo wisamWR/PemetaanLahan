@@ -87,9 +87,11 @@ constexpr int kExitRuntime = 1;
 constexpr int kExitUsage = 2;
 constexpr int kExitEngine = 3;
 
-// Ambang SEMENTARA untuk --kmeans auto (sama dengan MockLauncher). Ambang sebenarnya dari
-// Gavra (#10); ganti konstanta ini dan teks alasannya bila sudah ada.
-constexpr uint64_t kAutoCudaThresholdPixels = 8000000ULL;
+// Ambang --kmeans auto, dari pengukuran bench/run_bench.py (#10) di RTX 3050 Laptop + i7-13620H
+// (bench/results/bench_gpu_*.csv, sweep_gpu_*.csv): mulai 0,10 juta piksel (320x320) CUDA jelas
+// menang atas omp terbaik (5,7 vs 11,2 ms) sampai 33 juta piksel. Pada 0,04 juta (200x200) selisihnya
+// sekitar 1 ms, masih dalam derau, jadi di bawah ambang tetap omp. Ukur ulang bila mesin uji berubah.
+constexpr uint64_t kAutoCudaThresholdPixels = 100000ULL;
 
 constexpr int kContractVersion = 1;
 
@@ -543,7 +545,7 @@ Engine select_engine(const Options& o, uint64_t n) {
     }
     // auto
     const std::string basis = "N = " + juta_text(n) + " juta piksel";
-    const std::string limit = std::to_string(kAutoCudaThresholdPixels / 1000000ULL) + " juta (ambang sementara, belum dari Gavra #10)";
+    const std::string limit = juta_text(kAutoCudaThresholdPixels) + " juta (hasil benchmark #10)";
     Engine e;
     if (n >= kAutoCudaThresholdPixels) {
         if (have_cuda) {

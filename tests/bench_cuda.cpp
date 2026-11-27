@@ -1,7 +1,7 @@
 // bench_cuda.cpp - benchmark mode "cuda" pada citra sintetis, satu baris CSV sesuai kontrak butir 4.
 //
-//   bench_cuda --variant shared --width 7680 --height 4320 --k 8 --iters 20 --reps 5 \
-//              --out bench/results/cuda_shared.csv
+//   bench_cuda --variant shared --width 7680 --height 4320 --k 8 --iters 20 --reps 5
+//              --out bench/results/cuda_shared.csv          (satu baris perintah)
 //
 // --variant shared = kmeans_cuda (T4, versi utama), simple = kmeans_cuda_simple (T3).
 // Kolom mode tetap "cuda" sesuai kontrak; varian dibedakan lewat nama berkas keluaran.
