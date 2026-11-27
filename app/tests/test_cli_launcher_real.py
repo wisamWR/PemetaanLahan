@@ -117,8 +117,13 @@ def test_cpu_dan_opt_2048_valid_waktu_dari_core_dan_label_identik(core, data, ru
 
     cpu, opt = results["cpu"], results["opt"]
     assert cpu.meta["kmeans_device"] == "serial"
-    # `auto` pada 4,2 juta piksel (< ambang 8 juta): omp bila terhubung, selain itu serial
-    assert opt.meta["kmeans_device"] == ("omp" if info.omp else "serial")
+    # `auto`: cuda bila N >= ambang dari --info dan cuda terhubung, selain itu omp, lalu serial
+    n, limit = SIDE * SIDE, info.auto_cuda_threshold_pixels
+    if limit is not None and n >= limit and info.cuda:
+        expected = "cuda"
+    else:
+        expected = "omp" if info.omp else "serial"
+    assert opt.meta["kmeans_device"] == expected
     assert "kmeans_auto_reason" in opt.meta
     assert np.array_equal(cpu.centroids, opt.centroids) and np.array_equal(cpu.counts, opt.counts)
     assert (cpu.path / "labels.u8").read_bytes() == (opt.path / "labels.u8").read_bytes()
@@ -139,7 +144,7 @@ def test_mesin_eksplisit_yang_tidak_terhubung_kode_3_dengan_stderr_asli(core, da
 
 
 def test_cuda_eksplisit_perangkat_cuda_dan_identik_dengan_cpu(core, data, runs, info):
-    """`auto` pada 2048x2048 (< ambang 8 juta piksel) tidak memilih cuda, jadi cuda dipilih eksplisit."""
+    """cuda dipilih eksplisit (tidak lewat `auto`), supaya uji ini tidak bergantung pada ambang."""
     if not info.cuda:
         pytest.skip("cuda tidak terhubung pada build ini")
     by_mode = {}

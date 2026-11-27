@@ -22,6 +22,7 @@ build/
 docs/*
 !docs/PROFIL_L0.md
 !docs/PROFIL_L0_tabel.md
+!docs/BENCH_tabel.md
 CLAUDE.md
 
 # Indeks lokal code-review-graph
