@@ -1,0 +1,38 @@
+tanggal: 2026-11-27T16:34:32+07:00
+commit: eca9f1d
+git status:
+?? bench/results/quick_20261127_1633_cudavar_raw.csv
+?? bench/results/quick_20261127_1633_cudavar_summary.csv
+?? bench/results/quick_20261127_1633_env.txt
+?? bench/results/quick_20261127_1633_ksweep_raw.csv
+?? bench/results/quick_20261127_1633_ksweep_summary.csv
+?? bench/results/quick_20261127_1633_log.txt
+?? bench/results/quick_20261127_1633_weak_raw.csv
+?? bench/results/quick_20261127_1633_weak_summary.csv
+?? bench/results/run_20261127_1634_env.txt
+?? bench_hasil_quick_20261127_1633.tar.gz
+--- uname
+Linux samCode 6.6.87.2-microsoft-standard-WSL2 #1 SMP PREEMPT_DYNAMIC Thu Jun  5 18:30:46 UTC 2025 x86_64 x86_64 x86_64 GNU/Linux
+WSL: ya
+--- lscpu
+CPU(s):                               16
+Model name:                           13th Gen Intel(R) Core(TM) i7-13620H
+Thread(s) per core:                   2
+Core(s) per socket:                   8
+Socket(s):                            1
+--- memori
+               total        used        free      shared  buff/cache   available
+Mem:           7.6Gi       3.9Gi       1.8Gi        50Mi       2.1Gi       3.7Gi
+--- gpu
+name, driver_version, memory.total [MiB]
+NVIDIA GeForce RTX 3050 6GB Laptop GPU, 576.93, 6144 MiB
+--- nvcc
+Cuda compilation tools, release 12.9, V12.9.86
+Build cuda_12.9.r12.9/compiler.36037853_0
+--- gcc
+g++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+--- python
+Python 3.12.3
+numpy 1.26.4 PIL 10.2.0
+--- daya (laptop: pastikan charger terpasang, mode performa)
+Power Scheme GUID: 381b4222-f694-41f0-9685-ff5bb260df2e  (Balanced)
