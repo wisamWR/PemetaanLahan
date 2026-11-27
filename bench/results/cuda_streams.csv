@@ -1,0 +1,5 @@
+mode,image,width,height,k,iters,threads,read_ms,init_ms,kmeans_ms,color_ms,write_ms,total_ms,h2d_ms,kernel_ms,d2h_ms
+cuda_streams,synthetic_random,7680,4320,8,20,0,0,0.001,92.392,0,0,111.470,25.536,30.789,35.979
+cuda_streams,synthetic_random,7680,4320,4,20,0,0,0.002,100.357,0,0,131.870,26.519,30.156,39.050
+cuda_streams,synthetic_random,7680,4320,16,20,0,0,0.002,89.588,0,0,113.523,23.915,33.280,32.808
+cuda_streams,synthetic_random,10980,10980,8,20,0,0,0.001,374.913,0,0,406.108,112.778,116.619,146.225

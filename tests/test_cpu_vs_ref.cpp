@@ -1,8 +1,9 @@
-// Membandingkan kmeans_cpu (Azka) dengan ref_kmeans (Wisam), bit demi bit.
+// Membandingkan kmeans_cpu (Azka) dengan ref_kmeans (Wisam), bit demi bit, memakai verify_identical.
 #include <cstdio>
 #include <vector>
 #include "kmeans.h"
 #include "ref_kmeans.h"
+#include "verify.h"
 
 static std::vector<uint8_t> make_image(int w, int h, uint32_t seed) {
     std::vector<uint8_t> img(3 * (size_t)w * h);
@@ -23,10 +24,8 @@ static int compare(int w, int h, int k, uint32_t seed) {
     int ra = kmeans_cpu(img.data(), la.data(), ca.data(), &p, nullptr);
     int rb = ref_kmeans(img.data(), lb.data(), cb.data(), &p, nullptr);
     if (ra || rb) { std::printf("GAGAL panggilan: %d %d\n", ra, rb); return 1; }
-    size_t diff = 0;
-    for (size_t i = 0; i < n; i++) diff += (la[i] != lb[i]);
-    for (size_t i = 0; i < ca.size(); i++) diff += (ca[i] != cb[i]);
-    std::printf("%s %dx%d K=%d seed=%u: selisih=%zu\n",
+    long diff = verify_identical(lb.data(), cb.data(), la.data(), ca.data(), n, k, stdout);
+    std::printf("%s %dx%d K=%d seed=%u: selisih=%ld\n",
                 diff == 0 ? "[SAMA]" : "[BEDA]", w, h, k, seed, diff);
     return diff != 0;
 }

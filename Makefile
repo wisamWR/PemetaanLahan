@@ -3,7 +3,7 @@
 #   make cuda    bangun objek CUDA dari src/cuda/*.cu
 #   make test    uji referensi CPU, lalu uji CUDA vs referensi
 #   make bench          benchmark mode cuda, versi utama T4 (CSV ke bench/results/cuda_shared.csv)
-#   make bench-compare  benchmark T3 (simple) dan T4 (shared) pada citra yang sama
+#   make bench-compare  benchmark T3 (simple), T4 (shared), dan T5 (streams) pada citra yang sama
 #   make probe          percobaan analisis bottleneck (assign saja vs T3 vs T4 vs batas memori)
 #   make clean
 
@@ -62,6 +62,7 @@ bench: $(BUILD)/bench_cuda
 bench-compare:
 	$(MAKE) bench BENCH_VARIANT=simple
 	$(MAKE) bench BENCH_VARIANT=shared
+	$(MAKE) bench BENCH_VARIANT=streams
 
 probe: $(BUILD)/probe_cuda
 	./$(BUILD)/probe_cuda --width $(BENCH_W) --height $(BENCH_H) --k $(BENCH_K) \
@@ -102,6 +103,68 @@ $(BUILD)/cuda/%.o: src/cuda/%.cu
 
 clean:
 	rm -rf $(BUILD)
+
+# --- landcover (Ridlo, Langkah 11a) ----------------------------------------------------
+# Program penghubung src/cli/landcover.cpp -> build/landcover (dipakai app/launchers/cli.py).
+# Blok ini murni tambahan: variabel LC_*, tidak mengubah aturan di atas.
+#   make landcover          bangun build/landcover
+# Otomatis ikut tertaut bila ada: src/cpu/*.cpp (kmeans_cpu), src/omp/*.cpp (kmeans_omp),
+# tests/ref_kmeans.cpp (pengganti L0), dan objek CUDA (hanya bila nvcc DAN src/cuda/*.cu ada).
+# Baca/tulis PNG: src/cli/png_io_stb.cpp butuh third_party/stb/stb_image.h dan
+# stb_image_write.h (github.com/nothings/stb, domain publik/MIT; sudah ada di third_party/stb/).
+# Ganti implementasi PNG dengan
+#   make landcover LC_PNG_SRC=<berkas.cpp> LC_PNG_CHECK=
+# (antarmuka: src/cli/png_io.h, empat fungsi).
+# Syarat tautan otomatis: src/cpu/*.cpp dan src/omp/*.cpp ditautkan seluruhnya, jadi jangan
+# ada main() atau program uji di sana; berkas harus .cpp; nama dan tanda tangan fungsi harus
+# sama persis dengan src/common/kmeans.h (landcover mencari kmeans_cpu/kmeans_omp lewat
+# simbol weak: bila beda, mesin dianggap tidak ada, bukan galat tautan).
+
+LC_BUILD     := $(BUILD)/lc
+LC_CXXFLAGS  := -O3 -std=c++17 -Wall -Wextra -fopenmp -Isrc/common -Isrc/cli -Ithird_party/stb -MMD -MP
+LC_PNG_SRC   ?= src/cli/png_io_stb.cpp
+LC_PNG_CHECK ?= lc-check-stb
+LC_OBJS      := $(LC_BUILD)/cli/landcover.o $(LC_BUILD)/png_io.o
+LC_REF_OBJS  := $(if $(wildcard tests/ref_kmeans.cpp),$(REF_OBJS))
+LC_CPU_OBJS  := $(patsubst src/cpu/%.cpp,$(LC_BUILD)/cpu/%.o,$(wildcard src/cpu/*.cpp))
+LC_OMP_OBJS  := $(patsubst src/omp/%.cpp,$(LC_BUILD)/omp/%.o,$(wildcard src/omp/*.cpp))
+ifneq ($(and $(wildcard $(NVCC)),$(strip $(CUDA_SRCS))),)
+LC_LINK      := $(NVCC) $(NVCCFLAGS) -Xcompiler -fopenmp
+LC_LIBS      := -lgomp
+LC_CUDA_OBJS := $(CUDA_OBJS)
+else
+LC_LINK      := $(CXX) -fopenmp
+LC_LIBS      :=
+LC_CUDA_OBJS :=
+endif
+
+.PHONY: landcover lc-check-stb
+
+landcover: $(BUILD)/landcover
+
+$(BUILD)/landcover: $(LC_OBJS) $(COMMON_OBJS) $(LC_REF_OBJS) $(LC_CPU_OBJS) $(LC_OMP_OBJS) $(LC_CUDA_OBJS)
+	$(LC_LINK) $^ $(LC_LIBS) -o $@
+
+lc-check-stb:
+	@test -f third_party/stb/stb_image.h -a -f third_party/stb/stb_image_write.h || { \
+		echo "[landcover] third_party/stb/stb_image.h dan stb_image_write.h belum ada (sumber: github.com/nothings/stb; minta Ridlo menaruhnya, atau pakai backend lain: make landcover LC_PNG_SRC=<berkas.cpp> LC_PNG_CHECK=)"; \
+		exit 1; }
+
+$(LC_BUILD)/png_io.o: $(LC_PNG_SRC) | $(LC_PNG_CHECK)
+	@mkdir -p $(dir $@)
+	$(CXX) $(LC_CXXFLAGS) -c $< -o $@
+
+$(LC_BUILD)/cli/%.o: src/cli/%.cpp
+	@mkdir -p $(dir $@)
+	$(CXX) $(LC_CXXFLAGS) -c $< -o $@
+
+$(LC_BUILD)/cpu/%.o: src/cpu/%.cpp
+	@mkdir -p $(dir $@)
+	$(CXX) $(LC_CXXFLAGS) -c $< -o $@
+
+$(LC_BUILD)/omp/%.o: src/omp/%.cpp
+	@mkdir -p $(dir $@)
+	$(CXX) $(LC_CXXFLAGS) -c $< -o $@
 
 -include $(shell find $(BUILD) -name '*.d' 2>/dev/null)
 

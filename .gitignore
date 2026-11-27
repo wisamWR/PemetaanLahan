@@ -31,3 +31,14 @@ CLAUDE.md
 *.swp
 .DS_Store
 Thumbs.db
+
+# Aplikasi Python (bagian Ridlo)
+.venv/
+runs/
+__pycache__/
+*.u8
+.pytest_cache/
+
+# UI web (Vite/React): dependensi dan hasil build
+web/node_modules/
+web/dist/
