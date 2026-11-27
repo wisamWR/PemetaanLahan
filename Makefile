@@ -167,3 +167,25 @@ $(LC_BUILD)/omp/%.o: src/omp/%.cpp
 	$(CXX) $(LC_CXXFLAGS) -c $< -o $@
 
 -include $(shell find $(BUILD) -name '*.d' 2>/dev/null)
+
+# --- modul OpenMP (Gavra) -------------------------------------------------
+OMPFLAGS  := -fopenmp
+OMP_OBJS  := $(BUILD)/omp/kmeans_omp.o
+CPU_OBJS  := $(BUILD)/cpu/kmeans_cpu.o
+
+.PHONY: omp test-omp
+omp: $(OMP_OBJS)
+
+test-omp: $(BUILD)/test_omp_vs_cpu
+	./$(BUILD)/test_omp_vs_cpu
+
+$(BUILD)/test_omp_vs_cpu: $(BUILD)/tests/test_omp_vs_cpu.o $(OMP_OBJS) $(CPU_OBJS) $(COMMON_OBJS)
+	$(CXX) $(CXXFLAGS) $(OMPFLAGS) $^ -o $@
+
+$(BUILD)/omp/%.o: src/omp/%.cpp
+	@mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) $(OMPFLAGS) -c $< -o $@
+
+$(BUILD)/cpu/%.o: src/cpu/%.cpp
+	@mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) -c $< -o $@
