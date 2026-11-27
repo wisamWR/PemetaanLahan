@@ -19,7 +19,9 @@ build/
 *.sqlite
 
 # Dokumen internal dan instruksi Claude Code: hanya disimpan lokal, tidak di-push
-docs/
+docs/*
+!docs/PROFIL_L0.md
+!docs/PROFIL_L0_tabel.md
 CLAUDE.md
 
 # Indeks lokal code-review-graph
