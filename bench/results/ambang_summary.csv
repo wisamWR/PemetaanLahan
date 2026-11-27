@@ -1,0 +1,64 @@
+config,group,mode,image,width,height,k,iters,threads,read_ms,init_ms,kmeans_ms,color_ms,write_ms,total_ms,h2d_ms,kernel_ms,d2h_ms,io_threads,reps,speedup_total_vs_L0,efisiensi,identik,acuan,warmup_ms,wall_ms
+L2 omp x8,strong,omp,sintetis_lanskap_320x320,320,320,4,20,8,2.019,0.000,3.419,0.052,1.449,6.979,0.000,0.000,0.000,8,5,belum diukur,belum diukur,ya,L2 omp x8,0.000,40.566
+L1 cuda,strong,cuda,sintetis_lanskap_320x320,320,320,4,20,0,1.818,0.001,1.165,0.077,0.608,4.599,0.163,0.556,0.395,1,5,belum diukur,belum diukur,ya,L2 omp x8,223.066,291.298
+L1+L2 cuda x8,strong,cuda,sintetis_lanskap_320x320,320,320,4,20,0,2.394,0.001,1.553,0.049,1.054,5.976,0.154,0.811,0.522,8,5,belum diukur,belum diukur,ya,L2 omp x8,212.153,292.724
+L2 omp x8,strong,omp,sintetis_lanskap_320x320,320,320,8,20,8,1.976,0.000,5.070,0.050,2.926,10.196,0.000,0.000,0.000,8,5,belum diukur,belum diukur,ya,L2 omp x8,0.000,39.361
+L1 cuda,strong,cuda,sintetis_lanskap_320x320,320,320,8,20,0,1.961,0.001,1.062,0.097,2.396,5.877,0.148,0.572,0.371,1,5,belum diukur,belum diukur,ya,L2 omp x8,195.713,251.247
+L1+L2 cuda x8,strong,cuda,sintetis_lanskap_320x320,320,320,8,20,0,1.869,0.001,0.986,0.041,3.147,6.921,0.142,0.515,0.337,8,5,belum diukur,belum diukur,ya,L2 omp x8,198.943,278.948
+L2 omp x8,strong,omp,sintetis_lanskap_320x320,320,320,16,20,8,1.853,0.000,9.058,0.041,3.178,14.253,0.000,0.000,0.000,8,5,belum diukur,belum diukur,ya,L2 omp x8,0.000,36.009
+L1 cuda,strong,cuda,sintetis_lanskap_320x320,320,320,16,20,0,1.751,0.001,0.988,0.057,2.579,5.787,0.135,0.525,0.318,1,5,belum diukur,belum diukur,ya,L2 omp x8,181.525,230.642
+L1+L2 cuda x8,strong,cuda,sintetis_lanskap_320x320,320,320,16,20,0,1.984,0.001,1.142,0.043,3.451,7.648,0.195,0.609,0.360,8,5,belum diukur,belum diukur,ya,L2 omp x8,206.510,280.573
+L2 omp x8,strong,omp,sintetis_lanskap_640x640,640,640,4,20,8,6.200,0.000,9.558,0.179,2.666,20.187,0.000,0.000,0.000,8,5,belum diukur,belum diukur,ya,L2 omp x8,0.000,43.873
+L1 cuda,strong,cuda,sintetis_lanskap_640x640,640,640,4,20,0,5.965,0.001,2.438,0.237,1.632,11.158,0.329,1.125,0.994,1,5,belum diukur,belum diukur,ya,L2 omp x8,184.972,268.319
+L1+L2 cuda x8,strong,cuda,sintetis_lanskap_640x640,640,640,4,20,0,7.357,0.001,2.540,0.200,6.715,16.469,0.378,1.167,1.025,8,5,belum diukur,belum diukur,ya,L2 omp x8,178.901,270.145
+L2 omp x8,strong,omp,sintetis_lanskap_640x640,640,640,8,20,8,6.967,0.000,17.916,0.161,10.474,34.870,0.000,0.000,0.000,8,5,belum diukur,belum diukur,ya,L2 omp x8,0.000,71.090
+L1 cuda,strong,cuda,sintetis_lanskap_640x640,640,640,8,20,0,5.994,0.001,2.459,0.278,9.376,19.270,0.355,1.040,0.964,1,5,belum diukur,belum diukur,ya,L2 omp x8,195.683,278.845
+L1+L2 cuda x8,strong,cuda,sintetis_lanskap_640x640,640,640,8,20,0,6.819,0.001,2.564,0.161,12.109,22.030,0.358,0.992,1.163,8,5,belum diukur,belum diukur,ya,L2 omp x8,201.149,337.424
+L2 omp x8,strong,omp,sintetis_lanskap_640x640,640,640,16,20,8,6.190,0.000,33.665,0.146,15.744,56.569,0.000,0.000,0.000,8,5,belum diukur,belum diukur,ya,L2 omp x8,0.000,100.426
+L1 cuda,strong,cuda,sintetis_lanskap_640x640,640,640,16,20,0,6.387,0.002,2.389,0.285,12.793,22.961,0.339,0.949,1.002,1,5,belum diukur,belum diukur,ya,L2 omp x8,200.126,296.077
+L1+L2 cuda x8,strong,cuda,sintetis_lanskap_640x640,640,640,16,20,0,6.106,0.002,2.739,0.148,15.387,26.679,0.330,0.952,1.444,8,5,belum diukur,belum diukur,ya,L2 omp x8,213.227,318.044
+L2 omp x8,strong,omp,sintetis_lanskap_1000x1000,1000,1000,4,20,8,14.579,0.000,21.680,0.416,3.836,40.938,0.000,0.000,0.000,8,5,belum diukur,belum diukur,ya,L2 omp x8,0.000,68.147
+L1 cuda,strong,cuda,sintetis_lanskap_1000x1000,1000,1000,4,20,0,14.265,0.001,5.130,0.720,4.006,26.147,0.866,2.330,2.042,1,5,belum diukur,belum diukur,ya,L2 omp x8,176.357,265.053
+L1+L2 cuda x8,strong,cuda,sintetis_lanskap_1000x1000,1000,1000,4,20,0,14.632,0.001,4.976,0.457,5.580,27.728,0.790,2.326,1.920,8,5,belum diukur,belum diukur,ya,L2 omp x8,216.290,310.318
+L2 omp x8,strong,omp,sintetis_lanskap_1000x1000,1000,1000,8,20,8,13.252,0.000,42.428,0.445,14.276,70.747,0.000,0.000,0.000,8,5,belum diukur,belum diukur,ya,L2 omp x8,0.000,112.086
+L1 cuda,strong,cuda,sintetis_lanskap_1000x1000,1000,1000,8,20,0,13.650,0.001,4.953,0.801,16.521,37.643,0.639,2.129,2.186,1,5,belum diukur,belum diukur,ya,L2 omp x8,178.295,303.554
+L1+L2 cuda x8,strong,cuda,sintetis_lanskap_1000x1000,1000,1000,8,20,0,14.345,0.001,5.075,0.406,22.072,45.147,0.917,2.131,1.973,8,5,belum diukur,belum diukur,ya,L2 omp x8,218.712,399.707
+L2 omp x8,strong,omp,sintetis_lanskap_1000x1000,1000,1000,16,20,8,13.787,0.000,84.030,0.391,32.739,131.016,0.000,0.000,0.000,8,5,belum diukur,belum diukur,ya,L2 omp x8,0.000,203.252
+L1 cuda,strong,cuda,sintetis_lanskap_1000x1000,1000,1000,16,20,0,13.099,0.002,4.344,0.694,38.740,57.997,0.601,1.831,1.899,1,5,belum diukur,belum diukur,ya,L2 omp x8,153.289,319.322
+L1+L2 cuda x8,strong,cuda,sintetis_lanskap_1000x1000,1000,1000,16,20,0,13.522,0.002,4.769,0.407,30.558,50.770,0.649,1.837,2.321,8,5,belum diukur,belum diukur,ya,L2 omp x8,182.859,368.268
+L2 omp x8,strong,omp,sintetis_lanskap_2000x2000,2000,2000,4,20,8,60.151,0.000,97.992,2.255,8.114,168.006,0.000,0.000,0.000,8,5,belum diukur,belum diukur,ya,L2 omp x8,0.000,206.953
+L1 cuda,strong,cuda,sintetis_lanskap_2000x2000,2000,2000,4,20,0,53.452,0.001,18.173,2.862,15.522,98.070,1.981,8.636,7.547,1,5,belum diukur,belum diukur,ya,L2 omp x8,195.595,351.928
+L1+L2 cuda x8,strong,cuda,sintetis_lanskap_2000x2000,2000,2000,4,20,0,54.346,0.001,18.933,1.953,8.770,87.367,2.710,8.642,7.381,8,5,belum diukur,belum diukur,ya,L2 omp x8,178.565,370.855
+L2 omp x8,strong,omp,sintetis_lanskap_2000x2000,2000,2000,8,20,8,54.907,0.000,159.019,1.985,25.867,242.614,0.000,0.000,0.000,8,5,belum diukur,belum diukur,ya,L2 omp x8,0.000,298.683
+L1 cuda,strong,cuda,sintetis_lanskap_2000x2000,2000,2000,8,20,0,52.473,0.001,18.023,2.971,82.060,160.759,2.086,7.665,8.317,1,5,belum diukur,belum diukur,ya,L2 omp x8,230.156,472.868
+L1+L2 cuda x8,strong,cuda,sintetis_lanskap_2000x2000,2000,2000,8,20,0,53.484,0.001,17.811,2.168,29.397,105.821,2.288,7.673,7.904,8,5,belum diukur,belum diukur,ya,L2 omp x8,174.641,398.724
+L2 omp x8,strong,omp,sintetis_lanskap_2000x2000,2000,2000,16,20,8,52.710,0.000,319.160,1.808,46.790,421.336,0.000,0.000,0.000,8,5,belum diukur,belum diukur,ya,L2 omp x8,0.000,495.992
+L1 cuda,strong,cuda,sintetis_lanskap_2000x2000,2000,2000,16,20,0,59.881,0.003,20.506,3.664,157.381,244.149,3.055,6.748,10.687,1,5,belum diukur,belum diukur,ya,L2 omp x8,245.483,618.162
+L1+L2 cuda x8,strong,cuda,sintetis_lanskap_2000x2000,2000,2000,16,20,0,55.014,0.002,17.158,2.100,44.787,124.152,2.248,6.704,8.026,8,5,belum diukur,belum diukur,ya,L2 omp x8,283.215,573.823
+L2 omp x8,strong,omp,sintetis_lanskap_2500x2500,2500,2500,4,20,8,83.553,0.000,130.584,3.160,10.166,230.971,0.000,0.000,0.000,8,5,belum diukur,belum diukur,ya,L2 omp x8,0.000,267.052
+L1 cuda,strong,cuda,sintetis_lanskap_2500x2500,2500,2500,4,20,0,88.346,0.001,30.337,4.861,24.967,152.374,3.690,13.522,13.459,1,5,belum diukur,belum diukur,ya,L2 omp x8,340.885,670.060
+L1+L2 cuda x8,strong,cuda,sintetis_lanskap_2500x2500,2500,2500,4,20,0,90.849,0.001,30.933,3.120,9.341,138.335,4.716,13.538,13.249,8,5,belum diukur,belum diukur,ya,L2 omp x8,331.648,554.849
+L2 omp x8,strong,omp,sintetis_lanskap_2500x2500,2500,2500,8,20,8,81.006,0.000,253.173,2.960,30.642,371.566,0.000,0.000,0.000,8,5,belum diukur,belum diukur,ya,L2 omp x8,0.000,421.330
+L1 cuda,strong,cuda,sintetis_lanskap_2500x2500,2500,2500,8,20,0,84.659,0.001,27.119,4.416,104.234,224.135,3.914,12.226,11.164,1,5,belum diukur,belum diukur,ya,L2 omp x8,191.584,513.792
+L1+L2 cuda x8,strong,cuda,sintetis_lanskap_2500x2500,2500,2500,8,20,0,83.046,0.001,27.668,3.032,32.587,153.907,3.908,12.228,11.170,8,5,belum diukur,belum diukur,ya,L2 omp x8,185.983,444.569
+L2 omp x8,strong,omp,sintetis_lanskap_2500x2500,2500,2500,16,20,8,83.964,0.000,467.445,2.956,52.044,627.397,0.000,0.000,0.000,8,5,belum diukur,belum diukur,ya,L2 omp x8,0.000,696.652
+L1 cuda,strong,cuda,sintetis_lanskap_2500x2500,2500,2500,16,20,0,82.598,0.002,26.898,4.491,170.329,287.898,3.886,11.976,11.346,1,5,belum diukur,belum diukur,ya,L2 omp x8,180.829,568.940
+L1+L2 cuda x8,strong,cuda,sintetis_lanskap_2500x2500,2500,2500,16,20,0,82.667,0.003,27.938,3.477,56.045,171.223,3.598,11.940,11.368,8,5,belum diukur,belum diukur,ya,L2 omp x8,185.345,506.328
+L2 omp x8,strong,omp,sintetis_lanskap_3000x3000,3000,3000,4,20,8,124.120,0.000,191.067,4.351,12.312,333.842,0.000,0.000,0.000,8,5,belum diukur,belum diukur,ya,L2 omp x8,0.000,370.114
+L1 cuda,strong,cuda,sintetis_lanskap_3000x3000,3000,3000,4,20,0,117.686,0.001,40.278,6.577,35.329,202.368,5.182,19.404,16.160,1,5,belum diukur,belum diukur,ya,L2 omp x8,172.011,447.934
+L1+L2 cuda x8,strong,cuda,sintetis_lanskap_3000x3000,3000,3000,4,20,0,118.276,0.001,40.675,4.484,20.303,187.004,5.552,19.428,15.729,8,5,belum diukur,belum diukur,ya,L2 omp x8,186.782,478.354
+L2 omp x8,strong,omp,sintetis_lanskap_3000x3000,3000,3000,8,20,8,118.154,0.000,369.989,4.323,45.763,538.255,0.000,0.000,0.000,8,5,belum diukur,belum diukur,ya,L2 omp x8,0.000,601.675
+L1 cuda,strong,cuda,sintetis_lanskap_3000x3000,3000,3000,8,20,0,118.613,0.001,37.193,7.595,192.833,356.980,5.207,16.723,15.544,1,5,belum diukur,belum diukur,ya,L2 omp x8,184.654,669.375
+L1+L2 cuda x8,strong,cuda,sintetis_lanskap_3000x3000,3000,3000,8,20,0,119.186,0.001,40.023,4.742,51.897,218.133,5.649,16.692,17.368,8,5,belum diukur,belum diukur,ya,L2 omp x8,177.816,517.641
+L2 omp x8,strong,omp,sintetis_lanskap_3000x3000,3000,3000,16,20,8,117.226,0.000,690.625,4.365,86.925,896.557,0.000,0.000,0.000,8,5,belum diukur,belum diukur,ya,L2 omp x8,0.000,983.542
+L1 cuda,strong,cuda,sintetis_lanskap_3000x3000,3000,3000,16,20,0,120.146,0.002,36.762,6.448,335.951,503.663,5.301,15.008,16.222,1,5,belum diukur,belum diukur,ya,L2 omp x8,183.009,849.195
+L1+L2 cuda x8,strong,cuda,sintetis_lanskap_3000x3000,3000,3000,16,20,0,119.188,0.002,36.981,4.980,83.847,247.661,5.593,15.034,16.395,8,5,belum diukur,belum diukur,ya,L2 omp x8,179.594,562.995
+L2 omp x8,strong,omp,sintetis_lanskap_4000x3000,4000,3000,4,20,8,165.679,0.000,253.591,5.789,14.913,432.522,0.000,0.000,0.000,8,5,belum diukur,belum diukur,ya,L2 omp x8,0.000,469.942
+L1 cuda,strong,cuda,sintetis_lanskap_4000x3000,4000,3000,4,20,0,162.101,0.001,53.443,9.629,50.240,278.449,6.741,26.029,20.994,1,5,belum diukur,belum diukur,ya,L2 omp x8,190.795,553.991
+L1+L2 cuda x8,strong,cuda,sintetis_lanskap_4000x3000,4000,3000,4,20,0,157.131,0.001,55.808,6.847,19.680,248.125,7.457,25.998,23.288,8,5,belum diukur,belum diukur,ya,L2 omp x8,304.721,683.549
+L2 omp x8,strong,omp,sintetis_lanskap_4000x3000,4000,3000,8,20,8,171.831,0.000,477.773,7.154,55.489,703.528,0.000,0.000,0.000,8,5,belum diukur,belum diukur,ya,L2 omp x8,0.000,765.021
+L1 cuda,strong,cuda,sintetis_lanskap_4000x3000,4000,3000,8,20,0,172.988,0.002,60.416,9.439,208.109,459.236,8.311,23.356,28.528,1,5,belum diukur,belum diukur,ya,L2 omp x8,241.247,810.621
+L1+L2 cuda x8,strong,cuda,sintetis_lanskap_4000x3000,4000,3000,8,20,0,163.105,0.001,52.068,5.681,54.499,276.127,7.526,23.371,21.842,8,5,belum diukur,belum diukur,ya,L2 omp x8,211.626,599.736
+L2 omp x8,strong,omp,sintetis_lanskap_4000x3000,4000,3000,16,20,8,155.084,0.000,895.261,5.396,94.288,1151.185,0.000,0.000,0.000,8,5,belum diukur,belum diukur,ya,L2 omp x8,0.000,1224.664
+L1 cuda,strong,cuda,sintetis_lanskap_4000x3000,4000,3000,16,20,0,161.641,0.002,50.643,9.240,375.226,601.939,7.863,21.847,21.015,1,5,belum diukur,belum diukur,ya,L2 omp x8,187.443,951.346
+L1+L2 cuda x8,strong,cuda,sintetis_lanskap_4000x3000,4000,3000,16,20,0,157.335,0.002,50.076,5.607,90.957,305.488,6.858,21.816,21.402,8,5,belum diukur,belum diukur,ya,L2 omp x8,203.655,658.318
