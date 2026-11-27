@@ -122,7 +122,7 @@ clean:
 
 LC_BUILD     := $(BUILD)/lc
 LC_CXXFLAGS  := -O3 -std=c++17 -Wall -Wextra -fopenmp -Isrc/common -Isrc/cli -Ithird_party/stb -MMD -MP
-LC_PNG_SRC   ?= src/cli/png_io_stb.cpp
+LC_PNG_SRC   ?= src/cli/png_io_omp.cpp
 LC_PNG_CHECK ?= lc-check-stb
 LC_OBJS      := $(LC_BUILD)/cli/landcover.o $(LC_BUILD)/png_io.o
 LC_REF_OBJS  := $(if $(wildcard tests/ref_kmeans.cpp),$(REF_OBJS))
@@ -189,3 +189,26 @@ $(BUILD)/omp/%.o: src/omp/%.cpp
 $(BUILD)/cpu/%.o: src/cpu/%.cpp
 	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+# --- penulis PNG paralel OpenMP (Gavra, L2) ----------------------------------------------
+# Backend png_io pengganti stb (tulis PNG paralel). Dipakai landcover dengan:
+#   make landcover LC_PNG_SRC=src/cli/png_io_omp.cpp
+#   make test-png-omp    uji: tulis lalu baca kembali, piksel sama, berkas identik di 1/2/3/8 thread
+#   make bench-png       waktu tulis PNG per jumlah thread (peta-kelas 4000x3000)
+PNGOMP_SRC := src/cli/png_io_omp.cpp
+PNGOMP_FLAGS := -O3 -std=c++17 -Wall -Wextra -fopenmp -Isrc/cli -Ithird_party/stb
+
+.PHONY: test-png-omp bench-png
+test-png-omp: $(BUILD)/test_png_omp
+	./$(BUILD)/test_png_omp
+
+bench-png: $(BUILD)/bench_png_write
+	./$(BUILD)/bench_png_write
+
+$(BUILD)/test_png_omp: tests/test_png_omp.cpp $(PNGOMP_SRC) | lc-check-stb
+	@mkdir -p $(BUILD)
+	$(CXX) $(PNGOMP_FLAGS) $^ -o $@
+
+$(BUILD)/bench_png_write: tests/bench_png_write.cpp $(PNGOMP_SRC) | lc-check-stb
+	@mkdir -p $(BUILD)
+	$(CXX) $(PNGOMP_FLAGS) $^ -o $@
