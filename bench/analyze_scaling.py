@@ -191,8 +191,8 @@ def sec_weak(rows):
     o = ["## 4. Weak scaling OpenMP (beban per thread tetap)\n"]
     if not wk:
         o.append("**%s.** Tidak ada baris `group=weak` pada CSV yang dibaca. Jalankan: "
-                 "`python3 bench/run_bench.py --weak 1000x1000 --engines omp --k 8 --tag weak` (lihat "
-                 "`docs/BENCH_runbook.md`).\n" % NA)
+                 "`python3 bench/run_bench.py --weak 1000x1000 --engines omp --k 8 --tag weak` (atau "
+                 "`bash bench/run_all.sh`).\n" % NA)
         return "\n".join(o)
     o.append("Piksel = beban dasar x T. Efisiensi weak = t(T=1) / t(T), ideal 1,0. Dihitung untuk **K-Means saja** "
              "dan **Total**. Total biasanya jatuh karena baca PNG serial ikut membesar bersama citra.\n")
@@ -247,7 +247,7 @@ def sec_k(rows):
     multi = [i for i, ks in by_img.items() if len(ks) > 1]
     if not multi:
         o.append("**%s.** Semua citra pada CSV ini hanya diukur dengan satu nilai K. Jalankan sapuan K "
-                 "(`docs/BENCH_runbook.md`, langkah 2).\n" % NA)
+                 "(`bash bench/run_all.sh`, atau `run_bench.py --k 2,4,8,16`).\n" % NA)
         return "\n".join(o)
     o.append("K-Means (ms) per K. Rasio terhadap K terkecil menunjukkan apakah waktu tumbuh linear terhadap K "
              "(OpenMP/CPU diharapkan mendekati linear; CUDA lebih datar).\n")

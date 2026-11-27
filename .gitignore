@@ -25,6 +25,7 @@ docs/*
 !docs/BENCH_tabel.md
 !docs/AMBANG_AUTO.md
 !docs/BENCH_scaling_mesin_wisam.md
+!docs/fig/
 CLAUDE.md
 
 # Indeks lokal code-review-graph
