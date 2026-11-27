@@ -117,9 +117,14 @@ def test_cpu_dan_opt_2048_valid_waktu_dari_core_dan_label_identik(core, data, ru
 
     cpu, opt = results["cpu"], results["opt"]
     assert cpu.meta["kmeans_device"] == "serial"
-    # `auto`: cuda bila N >= ambang dari --info dan cuda terhubung, selain itu omp, lalu serial
-    n, limit = SIDE * SIDE, info.auto_cuda_threshold_pixels
-    if limit is not None and n >= limit and info.cuda:
+    # `auto`: cuda bila N*K >= ambang kerja dari --info (#12; biner lama: N >= ambang piksel) dan cuda
+    # terhubung, selain itu omp, lalu serial
+    n, k = SIDE * SIDE, P(mode="opt").k
+    if info.auto_cuda_threshold_work is not None:
+        want_cuda = n * k >= info.auto_cuda_threshold_work
+    else:
+        want_cuda = info.auto_cuda_threshold_pixels is not None and n >= info.auto_cuda_threshold_pixels
+    if want_cuda and info.cuda:
         expected = "cuda"
     else:
         expected = "omp" if info.omp else "serial"

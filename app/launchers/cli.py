@@ -104,7 +104,8 @@ class CoreInfo:
     cuda: bool                            # kmeans_cuda terhubung
     openmp: bool = False                  # dikompilasi dengan -fopenmp (I/O dan pewarnaan paralel)
     max_threads: int = 1
-    auto_cuda_threshold_pixels: int | None = None
+    auto_cuda_threshold_pixels: int | None = None   # padanan dalam piksel pada K=8 (hanya informasi)
+    auto_cuda_threshold_work: int | None = None     # aturan auto: cuda bila N*K >= nilai ini (#12)
 
     @property
     def kmeans_choices(self) -> tuple[str, ...]:
@@ -149,9 +150,12 @@ def parse_core_info(text: str) -> CoreInfo:
     threshold = data.get("auto_cuda_threshold_pixels")
     if threshold is not None and (not isinstance(threshold, int) or isinstance(threshold, bool)):
         raise ValueError("--info: auto_cuda_threshold_pixels harus bilangan bulat")
+    work = data.get("auto_cuda_threshold_work")             # tidak ada pada biner sebelum #12
+    if work is not None and (not isinstance(work, int) or isinstance(work, bool)):
+        raise ValueError("--info: auto_cuda_threshold_work harus bilangan bulat")
     return CoreInfo(
         cpu=cpu, omp=engines["omp"], cuda=engines["cuda"], openmp=bool(data.get("openmp", False)),
-        max_threads=threads, auto_cuda_threshold_pixels=threshold,
+        max_threads=threads, auto_cuda_threshold_pixels=threshold, auto_cuda_threshold_work=work,
     )
 
 

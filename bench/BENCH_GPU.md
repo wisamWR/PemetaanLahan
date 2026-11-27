@@ -57,6 +57,10 @@ Ambang `kAutoCudaThresholdPixels` di `src/cli/landcover.cpp` diganti dari 8.000.
 100.000 piksel: mulai titik ini CUDA unggul sekitar 2x. Pada 0,04 juta piksel selisihnya sekitar 1 ms, masih dalam
 derau. Di bawah ambang belum diukur rinci, jadi tetap omp.
 
+**Diganti di #12.** Angka di atas memakai `total_ms`, yang tidak memasukkan pemanasan konteks CUDA (±250 ms).
+Karena aplikasi menjalankan proses `landcover` baru tiap run, #12 membandingkan waktu dinding proses dan memakai
+aturan N × K ≥ 70 juta (`kAutoCudaThresholdWork`). Rincian: `docs/AMBANG_AUTO.md`, `bench/fit_auto_threshold.py`.
+
 ## Catatan
 
 1. OMP x16 lebih lambat daripada x8 di semua ukuran. Kemungkinan 16 thread WSL adalah hyperthread di atas inti
