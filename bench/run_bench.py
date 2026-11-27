@@ -35,6 +35,9 @@ Keluaran (--outdir, --tag):
   <tag>_raw.csv      satu baris per pengulangan, 16 kolom persis kontrak butir 14
   <tag>_summary.csv  median per konfigurasi + config, io_threads, speedup, efisiensi, identik
   --md               tabel Markdown (ringkasan, pemenang omp vs cuda per citra, yang dilewati)
+Kolom tambahan di summary: warmup_ms (init konteks CUDA, di luar total_ms) dan wall_ms (waktu dinding
+satu proses landcover). Untuk ambang mode otomatis pakai wall_ms: aplikasi memanggil landcover sebagai
+proses baru tiap run, jadi tiap run CUDA membayar warmup.
 """
 import argparse
 import csv
@@ -122,10 +125,13 @@ def read_json(path):
 def run_once(exe, cfg, png, name, k, iters, seed, out, timeout):
     cmd = [exe] + cfg.args + ["--input", png, "--name", name, "--k", str(k),
                               "--iters", str(iters), "--seed", str(seed), "--out", out]
+    t_proc = time.perf_counter()
     r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    wall_ms = (time.perf_counter() - t_proc) * 1000.0                # seluruh proses: start, warmup, semua tahap
     if r.returncode != 0:
         raise RuntimeError("kode %d: %s" % (r.returncode, (r.stderr or r.stdout).strip()[-300:]))
     t = read_json(os.path.join(out, "timing.json"))
+    t["wall_ms"] = wall_ms
     m = read_json(os.path.join(out, "meta.json"))
     sig = json.dumps([read_json(os.path.join(out, "centroids.json")),
                       read_json(os.path.join(out, "counts.json"))])
@@ -163,6 +169,8 @@ def measure(a, exe, cfg, png, label, k, ref, raw_w, skipped, group):
     for t in samples:
         raw_w.writerow([cfg.mode, label, W, H, k, a.iters, thr] + ["%.3f" % t.get(c, 0.0) for c in TIME_COLS])
     med = {c: median(s.get(c, 0.0) for s in samples) for c in TIME_COLS}
+    med["warmup_ms"] = median(s.get("warmup_ms", 0.0) for s in samples)   # init konteks CUDA, di luar total_ms
+    med["wall_ms"] = median(s["wall_ms"] for s in samples)                # waktu dinding satu proses landcover
     res = dict(group=group, config=cfg.label, mode=cfg.mode, image=label, width=W, height=H, k=k,
                iters=a.iters, threads=thr, io_threads=cfg.io_threads, med=med, reps=a.reps,
                identik="ya" if same else "BEDA", acuan=ref[key][0], speedup=None, efisiensi=None)
@@ -238,27 +246,31 @@ def write_outputs(a, results, skipped, raw_path, sum_path):
     with open(sum_path, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f, lineterminator="\n")
         w.writerow(["config", "group"] + COLS + ["io_threads", "reps", "speedup_total_vs_L0",
-                                                  "efisiensi", "identik", "acuan"])
+                                                  "efisiensi", "identik", "acuan", "warmup_ms",
+                                                  "wall_ms"])
         for r in results:
             w.writerow([r["config"], r["group"], r["mode"], r["image"], r["width"], r["height"], r["k"],
                         r["iters"], r["threads"]] + ["%.3f" % r["med"][c] for c in TIME_COLS] +
                        [r["io_threads"], r["reps"], fnum(r["speedup"], "%.3f"), fnum(r["efisiensi"], "%.3f"),
-                        r["identik"], r["acuan"]])
+                        r["identik"], r["acuan"], "%.3f" % r["med"].get("warmup_ms", 0.0),
+                        fnum(r["med"].get("wall_ms"), "%.3f")])
     os.makedirs(os.path.dirname(a.md) or ".", exist_ok=True)
     with open(a.md, "w", encoding="utf-8") as f:
         f.write("Benchmark landcover: median dari %d pengulangan (setelah 1 pemanasan), %d iterasi, seed %d, ms.\n"
                 "Speedup = total L0 / total konfigurasi (citra dan K sama). Efisiensi strong = speedup omp xT "
                 "terhadap omp x1, dibagi T; efisiensi weak = waktu omp x1 / waktu omp xT pada beban per thread tetap. "
-                "\"%s\" = tidak terukur. Pemeriksaan identik: centroid dan counts sama dengan acuan.\n\n"
+                "\"%s\" = tidak terukur. Pemeriksaan identik: centroid dan counts sama dengan acuan.\n"
+                "Warmup = inisialisasi konteks CUDA: TIDAK masuk Total, tetapi dibayar di setiap proses landcover "
+                "(aplikasi memanggil landcover sebagai proses baru tiap run). Proses = waktu dinding seluruh proses.\n\n"
                 % (a.reps, a.iters, a.seed, NA))
-        f.write("| Konfigurasi | Citra | Ukuran | K | Baca | Init | K-Means | Warna | Tulis | Total | Speedup | Efisiensi | Identik |\n")
-        f.write("|---|---|---|---|---|---|---|---|---|---|---|---|---|\n")
+        f.write("| Konfigurasi | Citra | Ukuran | K | Baca | Init | K-Means | Warna | Tulis | Total | Warmup | Proses | Speedup | Efisiensi | Identik |\n")
+        f.write("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|\n")
         for r in results:
             m = r["med"]
-            f.write("| %s | %s | %dx%d | %d | %s | %.1f | %s | %s | %s |\n" % (
+            f.write("| %s | %s | %dx%d | %d | %s | %.1f | %.1f | %s | %s | %s | %s |\n" % (
                 r["config"], r["image"], r["width"], r["height"], r["k"],
-                " | ".join("%.1f" % m[c] for c in STAGES), m["total_ms"],
-                fnum(r["speedup"], "%.2fx"), fnum(r["efisiensi"], "%.2f"), r["identik"]))
+                " | ".join("%.1f" % m[c] for c in STAGES), m["total_ms"], m.get("warmup_ms", 0.0),
+                fnum(m.get("wall_ms")), fnum(r["speedup"], "%.2fx"), fnum(r["efisiensi"], "%.2f"), r["identik"]))
         # Pemenang omp vs cuda per (citra, K): bahan ambang mode otomatis.
         groups = {}
         for r in results:
@@ -272,14 +284,24 @@ def write_outputs(a, results, skipped, raw_path, sum_path):
                 bo = min(o, key=lambda r: r["med"]["total_ms"])
                 bc = min(c, key=lambda r: r["med"]["total_ms"])
                 win = "cuda" if bc["med"]["total_ms"] < bo["med"]["total_ms"] else "omp"
-                rows.append((img, px, k, bo, bc, win))
+                # kriteria kedua: waktu dinding proses (termasuk warmup CUDA); tanpa wall_ms -> total + warmup
+                def wall(r):
+                    return r["med"].get("wall_ms") or (r["med"]["total_ms"] + r["med"].get("warmup_ms", 0.0))
+                wo = min(o, key=wall)
+                wc = min(c, key=wall)
+                win_w = "cuda" if wall(wc) < wall(wo) else "omp"
+                rows.append((img, px, k, bo, bc, win, wo, wc, win_w, wall))
         if rows:
-            f.write("\n### Pemenang omp vs cuda (total_ms, konfigurasi terbaik tiap mesin)\n\n")
-            f.write("Dasar penentuan ambang mode otomatis (konstanta sementara `kAutoCudaThresholdPixels` di landcover.cpp).\n\n")
-            f.write("| Citra | Piksel (juta) | K | Terbaik omp | Terbaik cuda | Pemenang |\n|---|---|---|---|---|---|\n")
-            for img, px, k, bo, bc, win in rows:
-                f.write("| %s | %.2f | %d | %s: %.1f | %s: %.1f | %s |\n" % (
-                    img, px / 1e6, k, bo["config"], bo["med"]["total_ms"], bc["config"], bc["med"]["total_ms"], win))
+            f.write("\n### Pemenang omp vs cuda (konfigurasi terbaik tiap mesin)\n\n")
+            f.write("Dasar penentuan ambang mode otomatis (`kAutoCudaThresholdPixels` di landcover.cpp). "
+                    "Dua kriteria: Total (tanpa warmup CUDA) dan Proses (waktu dinding, dengan warmup CUDA). "
+                    "Yang dirasakan pengguna adalah Proses.\n\n")
+            f.write("| Citra | Piksel (juta) | K | omp: Total | cuda: Total | Menang (Total) | omp: Proses | cuda: Proses | Menang (Proses) |\n"
+                    "|---|---|---|---|---|---|---|---|---|\n")
+            for img, px, k, bo, bc, win, wo, wc, win_w, wall in rows:
+                f.write("| %s | %.2f | %d | %.1f (%s) | %.1f (%s) | %s | %.1f (%s) | %.1f (%s) | %s |\n" % (
+                    img, px / 1e6, k, bo["med"]["total_ms"], bo["config"], bc["med"]["total_ms"], bc["config"], win,
+                    wall(wo), wo["config"], wall(wc), wc["config"], win_w))
         if skipped:
             f.write("\n### Dilewati (%s)\n\n" % NA)
             for tag, why in skipped:
