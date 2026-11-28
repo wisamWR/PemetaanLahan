@@ -1,0 +1,17 @@
+% DIBUAT OLEH laporan/skrip/tabel_ke_tex.py -- jangan disunting tangan.
+\begin{table}[H]
+\centering
+\caption{\emph{Weak scaling} OpenMP (beban per \emph{thread} tetap 2 juta piksel), citra sintetis, Mesin B (ms)}
+\label{tab:weak}
+\footnotesize
+\begin{tabularx}{\textwidth}{rL{2.4cm}>{\raggedleft\arraybackslash}X>{\raggedleft\arraybackslash}X>{\raggedleft\arraybackslash}X>{\raggedleft\arraybackslash}X>{\raggedleft\arraybackslash}X>{\raggedleft\arraybackslash}X>{\raggedleft\arraybackslash}X>{\raggedleft\arraybackslash}X}
+\hline
+\hdr{$T$} & \hdr{Citra} & \hdr{K-M $K{=}4$} & \hdr{$E_w$} & \hdr{Total $K{=}4$} & \hdr{$E_w$} & \hdr{K-M $K{=}8$} & \hdr{$E_w$} & \hdr{Total $K{=}8$} & \hdr{$E_w$} \\ \hline
+1 & 2000$\times$1000 & 197,5 & 1,00 & 237,1 & 1,00 & 343,0 & 1,00 & 415,0 & 1,00 \\ \hline
+2 & 4000$\times$1000 & 192,4 & 1,03 & 264,0 & 0,90 & 359,0 & 0,96 & 455,1 & 0,91 \\ \hline
+4 & 8000$\times$1000 & 257,1 & 0,77 & 389,6 & 0,61 & 461,5 & 0,74 & 626,9 & 0,66 \\ \hline
+8 & 16000$\times$1000 & 341,3 & 0,58 & 598,5 & 0,40 & 767,7 & 0,45 & 1100,5 & 0,38 \\ \hline
+16 & 32000$\times$1000 & 1038,3 & 0,19 & 1679,0 & 0,14 & 1451,7 & 0,24 & 2148,1 & 0,19 \\ \hline
+\end{tabularx}
+\par\smallskip\footnotesize\raggedright $E_w = t(T{=}1)/t(T)$, ideal 1. Sumber: \kode{run\_20261127\_1634\_weak\_summary.csv}.
+\end{table}

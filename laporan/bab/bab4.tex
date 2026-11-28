@@ -1,0 +1,121 @@
+% bab4.tex - Metodologi dan Implementasi Optimasi.
+% Sumber: src/cpu/kmeans_cpu.cpp, src/omp/kmeans_omp.cpp, src/cuda/kmeans_cuda.cu, src/cuda/kmeans_cuda_variants.h,
+% src/common/{kmeans.h,init.cpp,verify.h}, src/cli/{landcover.cpp,png_io_omp.cpp}, Makefile, docs/AMBANG_AUTO.md.
+% TANPA angka kinerja (semua hasil ukur ada di Bab V).
+\chapter{METODOLOGI DAN IMPLEMENTASI OPTIMASI}
+
+\section{Alur Optimasi Berbasis \emph{Bottleneck}}
+\label{sec:alur}
+Optimasi dilakukan secara bertahap mengikuti siklus ukur, optimasi, lalu ukur kembali:
+\begin{enumerate}
+    \item Menjalankan mode CPU saja dan mengukur waktu setiap tahap dengan \emph{timer} di dalam program.
+    \item Menentukan tahap yang paling dominan sebagai \emph{bottleneck}.
+    \item Mengoptimasi tahap tersebut dengan perangkat dan teknik yang paling sesuai.
+    \item Mengukur kembali waktu \emph{end-to-end} dan waktu per tahap untuk membuktikan peningkatannya, lalu mengulang dari langkah kedua untuk \emph{bottleneck} berikutnya.
+\end{enumerate}
+
+Dalam pelaksanaannya, urutan langkah mengikuti rencana proposal yang didasarkan pada kompleksitas algoritma, karena setiap modul dikerjakan oleh anggota yang berbeda secara bersamaan. K-Means dipindahkan ke GPU (L1), termasuk varian dengan \emph{streams} dan \emph{pinned memory} (L3). K-Means dan tahap pendukung (pewarnaan, \emph{counts}, dan tulis PNG) diparalelkan dengan OpenMP (L2). Keduanya lalu digabung di \kode{landcover}: K-Means di GPU dan tahap pendukung dengan OpenMP (L1+L2). \emph{Profiling} L0 yang dijalankan kemudian memastikan bahwa K-Means memang tahap terberat (Subbab~\ref{sec:profil}), dan pengukuran ulang setelah L1+L2 menunjukkan \emph{bottleneck} berikutnya. Konfigurasi setiap langkah ditunjukkan pada Tabel~\ref{tab:langkah}; hasil ukurnya ada di Subbab~\ref{sec:bertahap}.
+
+\begin{table}[H]
+\centering
+\caption{Langkah optimasi yang diukur}
+\label{tab:langkah}
+\begin{tabularx}{\textwidth}{|L{2cm}|Y|}
+\hline
+\hdr{Langkah} & \hdr{Konfigurasi} \\ \hline
+L0 & Mode CPU saja: semua tahap serial, K-Means dengan \kode{kmeans\_cpu} \\ \hline
+L1 & K-Means di GPU (\kode{kmeans\_cuda}), tahap lain serial \\ \hline
+L2 & K-Means dengan OpenMP (\kode{kmeans\_omp}) dan tahap pendukung dengan OpenMP, untuk 1--16 \emph{thread} \\ \hline
+L1+L2 & K-Means di GPU dan tahap pendukung dengan OpenMP; ini konfigurasi mode Optimalisasi untuk pekerjaan besar \\ \hline
+L3 & Varian \kode{kmeans\_cuda\_streams}: transfer per potongan lewat \emph{pinned memory} dan dua \emph{stream} (Subbab~\ref{sec:bersamaan}) \\ \hline
+\end{tabularx}
+\end{table}
+
+Proposal juga merencanakan \kode{perf} atau \kode{gprof} dan Nsight Systems. Pada pelaksanaannya \emph{profiling} cukup memakai \emph{timer} per tahap di dalam program dan CUDA \emph{events}, karena \kode{nsys} dan \kode{ncu} tidak terpasang di mesin uji.
+
+\section{Mode CPU Saja (\emph{Baseline})}
+\label{sec:l0}
+K-Means L0 (\kode{src/cpu/kmeans\_cpu.cpp}) ditulis dalam C++ dan dikompilasi dengan \kode{-O3}, agar perbandingan terhadap mode Optimalisasi jujur. Pada mode CPU saja, \kode{landcover} menetapkan satu \emph{thread} OpenMP untuk seluruh proses, sehingga pewarnaan, \emph{counts}, dan penulis PNG menjalankan kode yang sama dengan mode Optimalisasi tetapi tanpa paralelisme. Selisih waktu antara kedua mode dengan demikian berasal dari paralelisasi, bukan dari perbedaan algoritma atau pustaka.
+
+\section{Penempatan Tahap}
+\label{sec:penempatan}
+Penempatan akhir setiap tahap pada mode Optimalisasi ditunjukkan pada Tabel~\ref{tab:penempatan}. Penempatan ini mengikuti hasil \emph{profiling} dan diterapkan di \kode{src/cli/landcover.cpp} dan \kode{src/cli/png\_io\_omp.cpp}.
+
+\begin{table}[H]
+\centering
+\caption{Penempatan tahap pada mode Optimalisasi}
+\label{tab:penempatan}
+\begin{tabularx}{\textwidth}{|L{3.2cm}|L{3.6cm}|Y|}
+\hline
+\hdr{Tahap} & \hdr{Perangkat} & \hdr{Alasan} \\ \hline
+Baca dan dekode PNG & CPU serial (\kode{stb\_image}) & Satu aliran \emph{deflate} tidak bisa dipecah. Masukan berupa folder potongan PNG dengan \emph{manifest} dibaca paralel per potongan, tetapi tidak dipakai pada \emph{benchmark} \\ \hline
+Inisialisasi \emph{centroid} & CPU serial & Pekerjaan sangat kecil, dan harus sama persis di semua mode \\ \hline
+K-Means & CUDA bila $N \times K \geq 70$ juta, selain itu OpenMP & Komputasi terberat dan paralel per piksel; untuk pekerjaan kecil biaya GPU tidak sebanding (Subbab~\ref{sec:otomatis}) \\ \hline
+\emph{Counts} dan \emph{nodata} & OpenMP & Paralel per piksel; pekerjaan pendamping di luar waktu total \\ \hline
+Pratinjau dan \kode{labels.u8} & CPU serial & Pekerjaan pendamping antarmuka; pratinjau hanya mengambil sampel piksel \\ \hline
+Pewarnaan peta & OpenMP & Ringan dan paralel per piksel \\ \hline
+Tulis peta PNG & OpenMP per \emph{strip} & Pemampatan adalah bagian terberat penulisan dan dapat dipecah per \emph{strip} \\ \hline
+\end{tabularx}
+\end{table}
+
+\section{K-Means di GPU (L1)}
+\label{sec:cuda}
+Implementasi CUDA ada di \kode{src/cuda/kmeans\_cuda.cu} dan dibuat dalam dua tahap dengan hasil identik:
+\begin{itemize}
+    \item \textbf{T3, \kode{kmeans\_cuda\_simple}}: setiap \emph{thread} menambahkan pikselnya ke akumulator jumlah dan hitungan 64-bit di memori global dengan \kode{atomicAdd}. Karena jutaan \emph{thread} menulis ke paling banyak $4K$ alamat yang sama, operasi \emph{atomic} global saling antre. Varian ini dipertahankan sebagai pembanding dan cadangan.
+    \item \textbf{T4, \kode{kmeans\_cuda}} (versi utama, dipakai \kode{landcover}): setiap \emph{block} mengakumulasi di \emph{shared memory} dengan bilangan bulat 32-bit, lalu menggabungkan hasilnya ke akumulator global 64-bit sekali per \emph{block}. Jumlah piksel per \emph{block} dibatasi agar jumlah 32-bit per kanal tidak meluap.
+\end{itemize}
+
+Kedua varian memakai alur yang sama. \emph{Host} memvalidasi argumen, menghitung \emph{centroid} awal dengan fungsi bersama, lalu menyalin citra dan \emph{centroid} ke GPU satu kali. Seluruh iterasi kemudian berjalan di GPU: mengosongkan akumulator, menjalankan \emph{kernel} \emph{assignment} dan akumulasi, lalu \emph{kernel} \kode{update\_centroids}. \emph{Kernel} memakai 256 \emph{thread} per \emph{block} dengan \emph{grid-stride loop}, dan setiap \emph{block} memuat $K$ \emph{centroid} ke \emph{shared memory} karena jumlahnya kecil dan dibaca semua \emph{thread}. Karena \emph{update} juga berjalan di GPU, tidak ada data yang berpindah antara CPU dan GPU di antara iterasi; label dan \emph{centroid} disalin kembali satu kali di akhir. Piksel disimpan sebagai \kode{uint8} (3 \emph{byte} per piksel), sedangkan label disimpan sebagai \kode{int32} sesuai antarmuka bersama.
+
+Waktu salin ke GPU (h2d), seluruh \emph{loop} iterasi (\emph{kernel}), dan salin kembali (d2h) diukur dengan CUDA \emph{events}. Inisialisasi konteks CUDA tidak masuk ke waktu K-Means maupun waktu total karena \kode{landcover} melakukan pemanasan lebih dulu (Subbab~\ref{sec:kontrak}).
+
+\section{K-Means dan Tahap Pendukung dengan OpenMP (L2)}
+\label{sec:omp}
+\begin{itemize}
+    \item \textbf{K-Means} (\kode{src/omp/kmeans\_omp.cpp}): setiap iterasi membuka satu daerah paralel. \emph{Loop} piksel dibagi dengan \kode{\#pragma omp for schedule(static) nowait}. Setiap \emph{thread} memakai \emph{array} jumlah dan hitungan 64-bit miliknya sendiri di \emph{stack}, lalu menggabungkannya ke \emph{array} bersama di bagian \kode{critical} setelah \emph{loop}. Dengan cara ini tidak ada \kode{atomic} atau \kode{critical} di dalam \emph{loop} piksel. \emph{Update centroid} yang hanya $K$ elemen tetap serial.
+    \item \textbf{\emph{Counts} dan \emph{nodata}}: pola yang sama, yaitu hitungan lokal per \emph{thread} yang digabung di bagian \kode{critical}.
+    \item \textbf{Pewarnaan peta}: \kode{\#pragma omp parallel for schedule(static)} yang mengganti label setiap piksel dengan warna \emph{centroid}-nya, langsung di atas \emph{buffer} citra.
+    \item \textbf{Tulis PNG} (\kode{src/cli/png\_io\_omp.cpp}): penulis PNG buatan sendiri bergaya \kode{pigz}. Citra dibagi menjadi \emph{strip} baris berukuran tetap; setiap \emph{strip} difilter, dimampatkan (LZ77 dengan kode Huffman tetap), dan dihitung \emph{checksum}-nya oleh satu \emph{thread}, lalu \emph{strip} disambung berurutan. Karena setiap \emph{strip} dimampatkan mandiri, berkas keluaran identik \emph{byte} demi \emph{byte} untuk berapa pun jumlah \emph{thread}, dan piksel hasil dekodenya sama persis dengan masukan.
+\end{itemize}
+
+\section{Kerja Bersamaan CPU dan GPU (L3)}
+\label{sec:bersamaan}
+Yang dibuat untuk langkah ini adalah varian \kode{kmeans\_cuda\_streams}, yang dideklarasikan di \kode{src/cuda/\allowbreak kmeans\_cuda\_variants.h}. \emph{Kernel}-nya sama dengan T4, tetapi citra dikirim dan label diambil per potongan lewat \emph{pinned memory} dan dua CUDA \emph{stream}, sehingga transfer tumpang tindih dengan \emph{assignment} pada iterasi pertama dan terakhir. Hasilnya identik dengan \kode{kmeans\_cuda}.
+
+Rencana di proposal belum seluruhnya terlaksana. Varian ini hanya diukur di tingkat \emph{kernel} (program \kode{tests/bench\_cuda}) dan tidak dipanggil oleh \kode{landcover}, sehingga tidak ada di \emph{pipeline} maupun aplikasi. \emph{Pipeline} beberapa wilayah, yaitu GPU menjalankan K-Means wilayah ke-$i$ sementara CPU membaca wilayah ke-$(i+1)$ dan menulis wilayah ke-$(i-1)$, juga belum dibuat. Hasil ukur varian ini dibahas di Subbab~\ref{sec:hasilcuda}.
+
+\section{Pemilihan Mode Otomatis}
+\label{sec:otomatis}
+Pada mode Optimalisasi dengan \kode{-{}-kmeans auto}, \kode{landcover} memilih CUDA bila
+\begin{equation}
+    N \times K \geq 70 \text{ juta},
+    \label{eq:ambang}
+\end{equation}
+dan OpenMP bila tidak, dengan $N$ jumlah piksel dan $K$ jumlah kelompok. Bila CUDA tidak terhubung pada \emph{build}, pilihan jatuh ke OpenMP, lalu ke serial. Bila \kode{kmeans\_cuda} gagal saat berjalan, K-Means diulang dengan OpenMP (atau serial bila OpenMP tidak terhubung). Alasan pemilihan dicatat di \kode{meta.json} dan ditampilkan di antarmuka.
+
+Ambang ini berubah dua kali. Ambang awal sebesar 8 juta piksel hanya perkiraan sementara sebelum ada data. Ambang kedua, 100 ribu piksel, diturunkan dari waktu total yang tidak memuat pemanasan CUDA. Ambang ketiga, yang dipakai sekarang (Persamaan~\ref{eq:ambang}), diturunkan dari waktu dinding seluruh proses dengan dua alasan:
+\begin{enumerate}
+    \item Waktu K-Means OpenMP tumbuh sebanding dengan $N \times K$, sedangkan waktu K-Means CUDA hampir tidak bergantung pada $K$. Karena itu titik impasnya bergantung pada $N \times K$, bukan pada $N$ saja.
+    \item Setiap \emph{run} dari antarmuka menjalankan proses \kode{landcover} baru, sehingga inisialisasi konteks CUDA selalu dirasakan pengguna walaupun tidak masuk waktu total.
+\end{enumerate}
+Penurunan ambang ini dapat diulang dengan \kode{bench/fit\_auto\_threshold.py}; datanya dibahas di Subbab~\ref{sec:hasilambang}.
+
+\section{Jaminan Konsistensi Hasil}
+\label{sec:konsistensi}
+Agar semua mode menghasilkan keluaran identik, seluruh perhitungan inti memakai aritmetika bilangan bulat dengan aturan yang sama di \kode{kmeans\_cpu}, \kode{kmeans\_omp}, dan \kode{kmeans\_cuda}:
+\begin{itemize}
+    \item \textbf{Jarak}: kuadrat selisih R, G, B antara piksel dan \emph{centroid} dihitung dalam \kode{int32}, sehingga hasilnya eksak.
+    \item \textbf{Penjumlahan}: jumlah warna dan hitungan per kelompok diakumulasi dalam bilangan bulat 64-bit tak bertanda, sehingga hasilnya tidak bergantung pada urutan penjumlahan.
+    \item \textbf{\emph{Centroid} baru}: dihitung dengan pembagian bilangan bulat yang \textbf{dibulatkan ke bawah} untuk setiap kanal $c$ (proposal menulis ``dibulatkan''; yang diterapkan adalah pembulatan ke bawah):
+    \begin{equation}
+        \mu_{j,c} = \left\lfloor \frac{\sum_{x_i \in S_j} x_{i,c}}{|S_j|} \right\rfloor .
+        \label{eq:floor}
+    \end{equation}
+    \item \textbf{Jarak sama besar}: dipilih \emph{centroid} dengan indeks terkecil (perbandingan ``lebih kecil'' yang ketat).
+    \item \textbf{\emph{Cluster} kosong}: \emph{centroid} lama dipertahankan.
+    \item \textbf{\emph{Centroid} awal}: dipilih di CPU oleh satu fungsi bersama, \kode{kmeans\_init\_centroids} (\kode{src/common/init.cpp}), dengan pembangkit bilangan acak \emph{splitmix64} buatan sendiri dan \emph{seed} tetap. Setiap implementasi memanggil fungsi ini, sehingga \emph{centroid} awalnya sama.
+    \item \textbf{Iterasi}: tepat sebanyak jumlah iterasi yang diminta, tanpa berhenti lebih awal.
+\end{itemize}
+
+Hasil diverifikasi di dua tempat. Program uji inti memakai \kode{verify\_identical} (\kode{src/common/verify.h}) yang menghitung jumlah label dan \emph{centroid} yang berbeda; target verifikasi adalah nol perbedaan. Aplikasi membandingkan \kode{labels.u8} resolusi penuh, \emph{centroid}, dan \emph{counts} antara \emph{run} mode CPU saja dan mode Optimalisasi (\kode{app/landcover/verify.py}). Status hijau ``Label identik 100\%'' hanya diberikan bila label resolusi penuh benar-benar sama; perbandingan yang hanya memakai pratinjau ditandai sebagai verifikasi parsial. Karena labelnya identik, persentase dan luas setiap kelas juga identik.

@@ -1,0 +1,19 @@
+% DIBUAT OLEH laporan/skrip/tabel_ke_tex.py -- jangan disunting tangan.
+\begin{table}[H]
+\centering
+\caption{Rincian tahap K-Means CUDA (L1) per citra dan $K$, citra sintetis, Mesin B (ms)}
+\label{tab:cudarinci}
+\small
+\begin{tabularx}{\textwidth}{L{2.3cm}r>{\raggedleft\arraybackslash}X>{\raggedleft\arraybackslash}X>{\raggedleft\arraybackslash}X>{\raggedleft\arraybackslash}X>{\raggedleft\arraybackslash}X}
+\hline
+\hdr{Citra} & \hdr{$K$} & \hdr{h2d} & \hdr{\emph{Kernel}} & \hdr{d2h} & \hdr{K-Means} & \hdr{Pemanasan} \\ \hline
+4000$\times$3000 & 2 & 7,5 & 25,6 & 24,0 & 57,4 & 191 \\ \hline
+4000$\times$3000 & 4 & 11,3 & 26,0 & 22,5 & 59,6 & 195 \\ \hline
+1000$\times$1000 & 8 & 0,8 & 2,1 & 2,0 & 4,8 & -- \\ \hline
+2000$\times$2000 & 8 & 2,9 & 7,7 & 8,0 & 18,5 & -- \\ \hline
+4000$\times$3000 & 8 & 7,8 & 23,4 & 24,1 & 55,7 & 194 \\ \hline
+7680$\times$4320 & 8 & 21,6 & 53,7 & 62,1 & 138,9 & -- \\ \hline
+4000$\times$3000 & 16 & 9,2 & 21,9 & 23,6 & 59,7 & 214 \\ \hline
+\end{tabularx}
+\par\smallskip\footnotesize\raggedright h2d/\emph{kernel}/d2h diukur dengan CUDA \emph{events}. Pemanasan = inisialisasi konteks CUDA (\kode{warmup\_ms}), di luar \kode{total\_ms}; ``--'' = tidak direkam pada sesi \kode{bench\_gpu}.
+\end{table}

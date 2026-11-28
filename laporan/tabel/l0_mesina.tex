@@ -1,0 +1,18 @@
+% DIBUAT OLEH laporan/skrip/tabel_ke_tex.py -- jangan disunting tangan.
+\begin{table}[H]
+\centering
+\caption{Pembanding: waktu per tahap L0 di Mesin A (i7-1065G7), citra sintetis (ms)}
+\label{tab:l0a}
+\small
+\begin{tabularx}{\textwidth}{L{2.3cm}r>{\raggedleft\arraybackslash}X>{\raggedleft\arraybackslash}X>{\raggedleft\arraybackslash}X>{\raggedleft\arraybackslash}X>{\raggedleft\arraybackslash}X>{\raggedleft\arraybackslash}X>{\raggedleft\arraybackslash}X}
+\hline
+\hdr{Citra} & \hdr{$K$} & \hdr{Baca} & \hdr{Init} & \hdr{K-Means} & \hdr{Warna} & \hdr{Tulis} & \hdr{Total} & \hdr{Porsi K-Means} \\ \hline
+1000$\times$1000 & 8 & 19,0 & 0,0 & 313,9 & 0,9 & 42,8 & 375,1 & 84\% \\ \hline
+2000$\times$2000 & 8 & 67,0 & 0,0 & 1038,5 & 3,3 & 214,0 & 1322,8 & 79\% \\ \hline
+4000$\times$3000 & 8 & 201,0 & 0,0 & 3084,7 & 10,1 & 521,2 & 3827,2 & 81\% \\ \hline
+7680$\times$4320 & 8 & 569,4 & 0,0 & 8483,4 & 29,1 & 1198,9 & 10263,9 & 83\% \\ \hline
+4000$\times$3000 & 4 & 206,4 & 0,0 & 1514,7 & 9,9 & 267,4 & 2002,5 & 76\% \\ \hline
+4000$\times$3000 & 16 & 208,6 & 0,0 & 6556,9 & 10,8 & 1073,6 & 7871,4 & 83\% \\ \hline
+\end{tabularx}
+\par\smallskip\footnotesize\raggedright Median 5 ulangan setelah 1 pemanasan. Sumber: \kode{docs/PROFIL\_L0\_tabel.md} (\kode{bench/profile\_l0.py}). Mesin berbeda dengan tabel lain di bab ini; angkanya tidak dibandingkan langsung dengan Mesin B.
+\end{table}

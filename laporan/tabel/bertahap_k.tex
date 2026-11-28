@@ -1,0 +1,24 @@
+% DIBUAT OLEH laporan/skrip/tabel_ke_tex.py -- jangan disunting tangan.
+\begin{table}[H]
+\centering
+\caption{Optimasi bertahap pada 4000$\times$3000 untuk $K=2$, 4, dan 16, citra sintetis, Mesin B (ms; $S$ = \emph{speedup} terhadap L0)}
+\label{tab:bertahapk}
+\footnotesize
+\begin{tabularx}{\textwidth}{L{2.1cm}rL{2.3cm}>{\raggedleft\arraybackslash}X>{\raggedleft\arraybackslash}X>{\raggedleft\arraybackslash}X>{\raggedleft\arraybackslash}X>{\raggedleft\arraybackslash}X>{\raggedleft\arraybackslash}X}
+\hline
+\hdr{Citra} & \hdr{$K$} & \hdr{Konfigurasi} & \hdr{K-Means} & \hdr{$S$ K-Means} & \hdr{Total} & \hdr{$S$ Total} & \hdr{Proses} & \hdr{$S$ Proses} \\ \hline
+4000$\times$3000 & 2 & L0 & 640,7 & 1,0\ensuremath{\times} & 875,1 & 1,00\ensuremath{\times} & 916,1 & 1,00\ensuremath{\times} \\ \hline
+4000$\times$3000 & 2 & L2 (8 thr) & 197,0 & 3,3\ensuremath{\times} & 379,5 & 2,31\ensuremath{\times} & 415,5 & 2,20\ensuremath{\times} \\ \hline
+4000$\times$3000 & 2 & L1 & 57,4 & 11,2\ensuremath{\times} & 275,5 & 3,18\ensuremath{\times} & 574,3 & 1,60\ensuremath{\times} \\ \hline
+4000$\times$3000 & 2 & L1+L2 (4 thr) & 56,3 & 11,4\ensuremath{\times} & 248,7 & 3,52\ensuremath{\times} & 591,0 & 1,55\ensuremath{\times} \\ \hline
+4000$\times$3000 & 4 & L0 & 1017,2 & 1,0\ensuremath{\times} & 1224,8 & 1,00\ensuremath{\times} & 1258,4 & 1,00\ensuremath{\times} \\ \hline
+4000$\times$3000 & 4 & L2 (4 thr) & 302,2 & 3,4\ensuremath{\times} & 490,1 & 2,50\ensuremath{\times} & 516,0 & 2,44\ensuremath{\times} \\ \hline
+4000$\times$3000 & 4 & L1 & 59,6 & 17,1\ensuremath{\times} & 314,6 & 3,89\ensuremath{\times} & 642,0 & 1,96\ensuremath{\times} \\ \hline
+4000$\times$3000 & 4 & L1+L2 (2 thr) & 56,3 & 18,1\ensuremath{\times} & 249,1 & 4,92\ensuremath{\times} & 466,1 & 2,70\ensuremath{\times} \\ \hline
+4000$\times$3000 & 16 & L0 & 4794,6 & 1,0\ensuremath{\times} & 5400,7 & 1,00\ensuremath{\times} & 5509,7 & 1,00\ensuremath{\times} \\ \hline
+4000$\times$3000 & 16 & L2 (16 thr) & 684,2 & 7,0\ensuremath{\times} & 927,9 & 5,82\ensuremath{\times} & 1000,7 & 5,51\ensuremath{\times} \\ \hline
+4000$\times$3000 & 16 & L1 & 59,7 & 80,3\ensuremath{\times} & 609,9 & 8,86\ensuremath{\times} & 890,2 & 6,19\ensuremath{\times} \\ \hline
+4000$\times$3000 & 16 & L1+L2 (16 thr) & 50,5 & 95,0\ensuremath{\times} & 300,6 & 17,97\ensuremath{\times} & 613,4 & 8,98\ensuremath{\times} \\ \hline
+\end{tabularx}
+\par\smallskip\footnotesize\raggedright Keterangan kolom sama dengan Tabel~\ref{tab:bertahapk8}. Sumber: \kode{run\_20261127\_1634\_ksweep\_summary.csv}.
+\end{table}

@@ -1,0 +1,10 @@
+# Artefak build LaTeX (main.pdf final ikut di-commit)
+*.aux
+*.log
+*.out
+*.toc
+*.lof
+*.lot
+*.fls
+*.fdb_latexmk
+*.synctex.gz

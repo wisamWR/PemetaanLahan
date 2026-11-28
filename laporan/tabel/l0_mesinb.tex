@@ -1,0 +1,19 @@
+% DIBUAT OLEH laporan/skrip/tabel_ke_tex.py -- jangan disunting tangan.
+\begin{table}[H]
+\centering
+\caption{Waktu per tahap mode CPU saja (L0) dan porsi K-Means, citra sintetis, Mesin B (ms)}
+\label{tab:l0b}
+\small
+\begin{tabularx}{\textwidth}{L{2.3cm}r>{\raggedleft\arraybackslash}X>{\raggedleft\arraybackslash}X>{\raggedleft\arraybackslash}X>{\raggedleft\arraybackslash}X>{\raggedleft\arraybackslash}X>{\raggedleft\arraybackslash}X>{\raggedleft\arraybackslash}X}
+\hline
+\hdr{Citra} & \hdr{$K$} & \hdr{Baca} & \hdr{Init} & \hdr{K-Means} & \hdr{Warna} & \hdr{Tulis} & \hdr{Total} & \hdr{Porsi K-Means} \\ \hline
+4000$\times$3000 & 2 & 167,2 & 0,0 & 640,7 & 10,0 & 50,4 & 875,1 & 73\% \\ \hline
+4000$\times$3000 & 4 & 156,1 & 0,0 & 1017,2 & 9,6 & 51,9 & 1224,8 & 83\% \\ \hline
+1000$\times$1000 & 8 & 13,2 & 0,0 & 207,5 & 0,7 & 17,4 & 237,4 & 87\% \\ \hline
+2000$\times$2000 & 8 & 52,9 & 0,0 & 777,4 & 4,0 & 85,8 & 921,7 & 84\% \\ \hline
+4000$\times$3000 & 8 & 161,5 & 0,0 & 2385,1 & 11,8 & 215,2 & 2750,3 & 87\% \\ \hline
+7680$\times$4320 & 8 & 431,3 & 0,0 & 5870,6 & 24,0 & 419,3 & 6765,7 & 87\% \\ \hline
+4000$\times$3000 & 16 & 170,7 & 0,0 & 4794,6 & 13,8 & 417,7 & 5400,7 & 89\% \\ \hline
+\end{tabularx}
+\par\smallskip\footnotesize\raggedright Median 5 ulangan setelah 1 pemanasan, 20 iterasi, \emph{seed} 42. Sumber: \kode{bench\_gpu\_summary.csv} dan \kode{run\_20261127\_1634\_ksweep\_summary.csv} (4000$\times$3000 dari \emph{run} 16:34).
+\end{table}

@@ -1,0 +1,76 @@
+% lampiran.tex - Lampiran A (kontribusi), B (cara menjalankan), C (tautan repositori).
+% Tidak memakai \appendix: gaya bab template mencetak "BAB A".
+\chapter*{LAMPIRAN}
+\phantomsection\addcontentsline{toc}{chapter}{LAMPIRAN}
+
+\lstdefinestyle{perintah}{basicstyle=\ttfamily\small,columns=fullflexible,keepspaces=true,
+  backgroundcolor=\color{latarkode},frame=single,rulecolor=\color{garistabel},
+  xleftmargin=4pt,xrightmargin=4pt,aboveskip=4pt,belowskip=6pt}
+% Tabel lampiran bernomor A.1, bukan lanjutan nomor Bab VI.
+\setcounter{table}{0}
+\renewcommand{\thetable}{A.\arabic{table}}
+
+\section*{Lampiran A. Kontribusi Anggota}
+\phantomsection\addcontentsline{toc}{section}{Lampiran A. Kontribusi Anggota}
+Pembagian tugas mengikuti papan tugas tim di Notion (``Proyek HPC: Pemetaan Cepat Tutupan Lahan''). Setiap anggota memegang satu bagian utama yang saling bergantung lewat kontrak teknis bersama, sehingga kontribusi keempat anggota dinilai setara. Tabel~\ref{tab:kontribusi} merangkum tanggung jawab dan hasil setiap anggota; nomor PR merujuk ke repositori pada Lampiran C.
+
+\begin{table}[H]
+\centering
+\caption{Kontribusi anggota kelompok}
+\label{tab:kontribusi}
+\small
+\begin{tabularx}{\textwidth}{|L{1.6cm}|L{4.4cm}|Y|}
+\hline
+\hdr{Anggota} & \hdr{Tanggung jawab} & \hdr{Hasil utama} \\ \hline
+Azka & Mode CPU saja (L0), baca/tulis citra, persiapan data, modul verifikasi & \kode{kmeans\_cpu} sebagai acuan L0 (PR \#1); baca/tulis citra dengan \kode{stb\_image}; unduh Sentinel-2 dan konversi/potong ke PNG dengan GDAL; modul \kode{verify\_identical} (PR \#6) dan verifikasi label identik di semua mode \\ \hline
+Gavra & \emph{Profiling}, K-Means OpenMP dan tahap pendukung, mode otomatis, \emph{benchmark} dan analisis \emph{scaling} & \emph{Profiling} L0 dan dokumentasi \emph{bottleneck} (PR \#8); \kode{kmeans\_omp}, pewarnaan, dan tulis PNG paralel per strip (PR \#5, \#9); skrip \emph{benchmark}, \emph{speedup}, \emph{strong}/\emph{weak scaling} (PR \#10, \#11, \#13); pemilihan mode otomatis (PR \#12) \\ \hline
+Wisam & K-Means CUDA dan optimasinya, kerja bersamaan CPU--GPU & Repositori dan struktur folder; \kode{kmeans\_cuda} versi \kode{atomicAdd} global (T3) dan reduksi \emph{shared memory} (T4) (PR \#2); \kode{kmeans\_cuda\_streams} dengan \emph{streams} dan \emph{pinned memory} (PR \#3); pengukuran di Mesin B dan ambang $N\times K$ (bersama Gavra) \\ \hline
+Ridlo & Antarmuka aplikasi, pelabelan dan luas, integrasi, demo, laporan & Program penghubung \kode{landcover}; modul pelabelan kelas dan perhitungan luas; antarmuka web React dan API FastAPI; penanganan \emph{nodata} (PR \#7); uji aplikasi dengan Sentinel-2; penyusunan laporan dan demo \\ \hline
+\end{tabularx}
+\end{table}
+
+\textbf{Azka (L0, data, dan verifikasi).} Azka membuat \kode{kmeans\_cpu}, implementasi serial yang menjadi acuan kinerja dan acuan kebenaran bagi semua mode lain. Azka juga menyiapkan pembacaan dan penulisan citra, mengunduh citra Sentinel-2, lalu mengonversi dan memotong kanal B04/B03/B02 menjadi PNG dengan GDAL. Modul \kode{verify\_identical} buatannya dipakai untuk membuktikan bahwa label dan \emph{centroid} semua mode identik dengan L0.
+
+\textbf{Gavra (OpenMP, \emph{profiling}, dan \emph{benchmark}).} Gavra melakukan \emph{profiling} L0 yang menetapkan K-Means sebagai \emph{bottleneck} utama, lalu membuat \kode{kmeans\_omp} serta versi OpenMP dari pewarnaan dan tulis PNG per strip. Gavra menyusun skrip \emph{benchmark} dan analisis \emph{speedup}, efisiensi, serta \emph{strong} dan \emph{weak scaling} yang menjadi dasar Bab~V, dan bersama Wisam menetapkan aturan pemilihan mode otomatis.
+
+\textbf{Wisam (CUDA dan L3).} Wisam menyiapkan repositori dan membuat K-Means CUDA, mulai dari versi \kode{atomicAdd} global (T3) sampai reduksi \emph{shared memory} (T4) yang dipakai \kode{landcover}. Wisam juga membuat varian \emph{streams} dengan \emph{pinned memory} (T5) sebagai langkah L3, dan menjalankan pengukuran lengkap di mesinnya (Mesin B) yang menjadi sumber semua angka kinerja Bab~V.
+
+\textbf{Ridlo (aplikasi, integrasi, dan laporan).} Ridlo membuat program penghubung \kode{landcover} yang menyatukan baca citra, K-Means, \emph{counts}, pewarnaan, dan folder \emph{run}, lalu membangun antarmuka web (halaman Pemetaan dan Kinerja) beserta modul pelabelan kelas dan perhitungan luas. Ridlo menguji aplikasi dengan citra Sentinel-2, menyusun laporan ini, dan menyiapkan demo.
+
+\section*{Lampiran B. Cara Menjalankan}
+\phantomsection\addcontentsline{toc}{section}{Lampiran B. Cara Menjalankan}
+Ringkasan ini diambil dari berkas \kode{README.md} di akar repositori. Rinciannya ada di \kode{app/tools/README.md} dan \kode{web/README.md}.
+
+\textbf{1. \emph{Build} dan uji program inti (terminal WSL).} Repositori diletakkan di \emph{filesystem} Linux WSL, bukan \kode{/mnt/*}. CUDA ikut tertaut bila \kode{nvcc} tersedia.
+\begin{lstlisting}[style=perintah]
+git clone https://github.com/wisamWR/PemetaanLahan.git ~/PemetaanLahan
+cd ~/PemetaanLahan
+make landcover            # program inti
+./build/landcover --info  # cek omp, cuda, dan ambang otomatis
+make test                 # uji referensi CPU, lalu CUDA vs referensi
+make test-omp             # kmeans_omp vs kmeans_cpu
+make test-png-omp         # penulis PNG paralel vs masukan
+\end{lstlisting}
+
+\textbf{2. Persiapan aplikasi (PowerShell di Windows, dari akar repositori).} Diperlukan Python 3.12 atau lebih baru dan Node.js.
+\begin{lstlisting}[style=perintah]
+python -m venv .venv
+.venv\Scripts\python.exe -m pip install -r app\requirements.txt
+npm --prefix web install
+.venv\Scripts\python.exe -m pytest -q   # uji aplikasi
+\end{lstlisting}
+
+% Paragraf dan kotak perintah langkah 3 dibungkus minipage agar tidak terpisah halaman.
+\par\noindent\begin{minipage}{\linewidth}
+\setlength{\parindent}{1.25cm}\setlength{\parskip}{6pt}\indent
+\textbf{3. Menjalankan aplikasi (satu perintah).} Perintah berikut membangun antarmuka bila perlu, lalu menyajikan API dan UI di \kode{http://127.0.0.1:8000}. Citra PNG dibaca dari folder \kode{data/} (ganti dengan \kode{-{}-data-dir}) atau diunggah dari halaman Pemetaan. Bila biner \kode{landcover} tidak berada di \kode{\$HOME/PemetaanLahan/build/landcover}, variabel \kode{LC\_WSL\_BIN} perlu diisi dengan lokasinya di dalam WSL. Tanpa \kode{-{}-backend cli}, aplikasi memakai data tiruan yang ditandai ``DATA TIRUAN''.
+\begin{lstlisting}[style=perintah]
+app\tools\run_web.cmd --backend cli --open
+\end{lstlisting}
+\end{minipage}
+
+\section*{Lampiran C. Tautan Repositori}
+\phantomsection\addcontentsline{toc}{section}{Lampiran C. Tautan Repositori}
+Kode sumber, hasil \emph{benchmark} (\kode{bench/results/}), dan sumber laporan ini (\kode{laporan/}) tersedia di repositori GitHub berikut:
+
+\url{https://github.com/wisamWR/PemetaanLahan}

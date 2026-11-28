@@ -1,0 +1,9 @@
+{
+  "keterangan": "Penamaan kelas manual (Ridlo, PROGRESS Sesi U 25 Nov) dari warna centroid dan kenampakan visual run MDM_bersih_2048px, K=8, iters=20, seed=42. Kelompok 7 = nodata (0,0,0), tidak dinamai.",
+  "kelas": [
+    ["Vegetasi", [2, 5, 6]],
+    ["Lahan terbuka", [0, 3]],
+    ["Lahan terbangun", [1]],
+    ["Lainnya", [4]]
+  ]
+}

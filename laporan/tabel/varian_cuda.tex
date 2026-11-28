@@ -1,0 +1,22 @@
+% DIBUAT OLEH laporan/skrip/tabel_ke_tex.py -- jangan disunting tangan.
+\begin{table}[H]
+\centering
+\caption{Varian CUDA pada tahap K-Means saja (\kode{tests/bench\_cuda}, citra acak), Mesin B (ms)}
+\label{tab:variancuda}
+\small
+\begin{tabularx}{\textwidth}{L{2.3cm}r>{\raggedleft\arraybackslash}X>{\raggedleft\arraybackslash}X>{\raggedleft\arraybackslash}X>{\raggedleft\arraybackslash}X>{\raggedleft\arraybackslash}X}
+\hline
+\hdr{Ukuran} & \hdr{$K$} & \hdr{T3 \emph{simple}} & \hdr{T4 \emph{shared}} & \hdr{T5 \emph{streams}} & \hdr{T4 vs T3} & \hdr{T5 vs T3} \\ \hline
+1000$\times$1000 & 4 & 48,0 & 2,8 & 4,2 & 16,9\ensuremath{\times} & 11,4\ensuremath{\times} \\ \hline
+1000$\times$1000 & 8 & 39,6 & 3,0 & 3,7 & 13,2\ensuremath{\times} & 10,6\ensuremath{\times} \\ \hline
+1000$\times$1000 & 16 & 29,1 & 3,1 & 4,3 & 9,5\ensuremath{\times} & 6,7\ensuremath{\times} \\ \hline
+2000$\times$2000 & 8 & 154,1 & 9,7 & 11,6 & 15,9\ensuremath{\times} & 13,3\ensuremath{\times} \\ \hline
+4000$\times$3000 & 4 & 450,8 & 30,3 & 39,8 & 14,9\ensuremath{\times} & 11,3\ensuremath{\times} \\ \hline
+4000$\times$3000 & 8 & 462,6 & 30,6 & 43,6 & 15,1\ensuremath{\times} & 10,6\ensuremath{\times} \\ \hline
+4000$\times$3000 & 16 & 317,4 & 31,5 & 40,7 & 10,1\ensuremath{\times} & 7,8\ensuremath{\times} \\ \hline
+7680$\times$4320 & 4 & 1233,5 & 91,3 & 96,4 & 13,5\ensuremath{\times} & 12,8\ensuremath{\times} \\ \hline
+7680$\times$4320 & 8 & 1277,8 & 98,1 & 101,0 & 13,0\ensuremath{\times} & 12,7\ensuremath{\times} \\ \hline
+7680$\times$4320 & 16 & 888,0 & 89,6 & 95,6 & 9,9\ensuremath{\times} & 9,3\ensuremath{\times} \\ \hline
+\end{tabularx}
+\par\smallskip\footnotesize\raggedright Diukur di luar \kode{landcover} (tanpa baca/tulis PNG). Sumber: \kode{run\_20261127\_1634\_cudavar\_summary.csv}.
+\end{table}

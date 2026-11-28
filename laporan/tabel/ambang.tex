@@ -1,0 +1,33 @@
+% DIBUAT OLEH laporan/skrip/tabel_ke_tex.py -- jangan disunting tangan.
+\begin{table}[H]
+\centering
+\caption{Pemenang OpenMP vs CUDA menurut Total dan menurut Proses pada 21 konfigurasi, citra sintetis, Mesin B (ms)}
+\label{tab:ambang}
+\footnotesize
+\begin{tabularx}{\textwidth}{rr>{\raggedleft\arraybackslash}X>{\raggedleft\arraybackslash}X>{\raggedleft\arraybackslash}X>{\raggedleft\arraybackslash}X>{\raggedleft\arraybackslash}X>{\raggedleft\arraybackslash}X>{\raggedleft\arraybackslash}X>{\raggedleft\arraybackslash}X}
+\hline
+\hdr{$N$ (juta)} & \hdr{$K$} & \hdr{$N{\times}K$ (juta)} & \hdr{omp Total} & \hdr{cuda Total} & \hdr{Unggul} & \hdr{omp Proses} & \hdr{cuda Proses} & \hdr{Unggul} & \hdr{Aturan} \\ \hline
+0,10 & 4 & 0,4 & 7,0 & 4,6 & cuda & 40,6 & 291,3 & omp & omp \\ \hline
+0,41 & 4 & 1,6 & 20,2 & 11,2 & cuda & 43,9 & 268,3 & omp & omp \\ \hline
+1,00 & 4 & 4,0 & 40,9 & 26,1 & cuda & 68,1 & 265,1 & omp & omp \\ \hline
+4,00 & 4 & 16,0 & 168,0 & 87,4 & cuda & 207,0 & 351,9 & omp & omp \\ \hline
+6,25 & 4 & 25,0 & 231,0 & 138,3 & cuda & 267,1 & 554,8 & omp & omp \\ \hline
+9,00 & 4 & 36,0 & 333,8 & 187,0 & cuda & 370,1 & 447,9 & omp & omp \\ \hline
+12,00 & 4 & 48,0 & 432,5 & 248,1 & cuda & 469,9 & 554,0 & omp & omp \\ \hline
+0,10 & 8 & 0,8 & 10,2 & 5,9 & cuda & 39,4 & 251,2 & omp & omp \\ \hline
+0,41 & 8 & 3,3 & 34,9 & 19,3 & cuda & 71,1 & 278,8 & omp & omp \\ \hline
+1,00 & 8 & 8,0 & 70,7 & 37,6 & cuda & 112,1 & 303,6 & omp & omp \\ \hline
+4,00 & 8 & 32,0 & 242,6 & 105,8 & cuda & 298,7 & 398,7 & omp & omp \\ \hline
+6,25 & 8 & 50,0 & 371,6 & 153,9 & cuda & 421,3 & 444,6 & omp & omp \\ \hline
+9,00 & 8 & 72,0 & 538,3 & 218,1 & cuda & 601,7 & 517,6 & cuda & cuda \\ \hline
+12,00 & 8 & 96,0 & 703,5 & 276,1 & cuda & 765,0 & 599,7 & cuda & cuda \\ \hline
+0,10 & 16 & 1,6 & 14,3 & 5,8 & cuda & 36,0 & 230,6 & omp & omp \\ \hline
+0,41 & 16 & 6,6 & 56,6 & 23,0 & cuda & 100,4 & 296,1 & omp & omp \\ \hline
+1,00 & 16 & 16,0 & 131,0 & 50,8 & cuda & 203,3 & 319,3 & omp & omp \\ \hline
+4,00 & 16 & 64,0 & 421,3 & 124,2 & cuda & 496,0 & 573,8 & omp & omp \\ \hline
+6,25 & 16 & 100,0 & 627,4 & 171,2 & cuda & 696,7 & 506,3 & cuda & cuda \\ \hline
+9,00 & 16 & 144,0 & 896,6 & 247,7 & cuda & 983,5 & 563,0 & cuda & cuda \\ \hline
+12,00 & 16 & 192,0 & 1151,2 & 305,5 & cuda & 1224,7 & 658,3 & cuda & cuda \\ \hline
+\end{tabularx}
+\par\smallskip\footnotesize\raggedright omp = \kode{L2 omp x8}; cuda = yang tercepat dari L1 dan L1+L2 (8 \emph{thread}) untuk kriteria itu. Proses = waktu dinding, termasuk pemanasan CUDA. Aturan = pilihan $N\times K\geq70$ juta. Sumber: \kode{bench/results/ambang\_summary.csv} (\kode{bench/fit\_auto\_threshold.py}).
+\end{table}

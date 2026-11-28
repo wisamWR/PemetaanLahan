@@ -63,6 +63,45 @@ Catatan pengukuran: di WSL 2, durasi dari `cudaEvent` (`kmeans_ms`) terukur seki
 lebih besar daripada waktu dinding host (`total_ms`) untuk panggilan yang sama. Penyebabnya belum
 diketahui; anggap selisih sebesar itu sebagai batas ketelitian saat membandingkan angka.
 
+## Menjalankan aplikasi
+
+Aplikasi berupa UI web (React) dengan API FastAPI yang berjalan di Windows dan memanggil program inti
+`landcover` di WSL. Halaman **Pemetaan** membuat peta kelas, pelabelan, dan tabel luas; halaman **Kinerja**
+membandingkan mode CPU saja dengan mode Optimalisasi beserta verifikasi hasil identik.
+
+Prasyarat (sekali):
+
+1. **WSL:** bangun `landcover` di filesystem Linux WSL (bukan `/mnt/*`). CUDA ikut tertaut bila `nvcc` ada.
+
+   ```bash
+   git clone https://github.com/wisamWR/PemetaanLahan.git ~/PemetaanLahan
+   cd ~/PemetaanLahan && make landcover
+   ./build/landcover --info     # periksa: omp dan cuda terhubung, ambang mode otomatis
+   ```
+
+   Bila biner ada di tempat lain, setel `LC_WSL_BIN` (path di dalam WSL) di Windows sebelum menjalankan
+   aplikasi. Bawaannya `$HOME/PemetaanLahan/build/landcover`.
+2. **Windows, dari root repo:** Python 3.12 atau lebih baru dan Node.js.
+
+   ```powershell
+   python -m venv .venv
+   .venv\Scripts\python.exe -m pip install -r app\requirements.txt
+   npm --prefix web install
+   ```
+
+Menjalankan (satu perintah, dari root repo di Windows):
+
+```powershell
+app\tools\run_web.cmd --backend cli --open
+```
+
+Perintah ini membangun frontend bila perlu, lalu menyajikan API dan UI di http://127.0.0.1:8000. Citra PNG
+dibaca dari `data/` (tidak di-commit; ganti dengan `--data-dir`) atau diunggah dari halaman Pemetaan. Tanpa
+`--backend cli`, aplikasi memakai backend tiruan dan semua hasil bertanda DATA TIRUAN.
+
+Rincian: opsi `run_web.cmd`, pembungkus WSL `lc_wsl.cmd`, dan catatan pengukuran di `app/tools/README.md`;
+mode pengembangan frontend di `web/README.md`.
+
 ## Struktur folder
 
 ```

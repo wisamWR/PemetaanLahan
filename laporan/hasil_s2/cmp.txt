@@ -1,0 +1,8 @@
+# cmp hasil run cpu vs omp vs cuda (MDM_bersih_2048px, K=8, iters=20, seed=42, --write-labels)
+# biner: ~/pl_main_check/build/landcover (main f78b5d4), Mesin C, 2026-11-28
+cpu omp labels.u8 SAMA 4194304
+cpu omp centroids.json SAMA 131
+cpu omp counts.json SAMA 65
+cpu cuda labels.u8 SAMA 4194304
+cpu cuda centroids.json SAMA 131
+cpu cuda counts.json SAMA 65

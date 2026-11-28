@@ -1,0 +1,19 @@
+% DIBUAT OLEH laporan/skrip/tabel_ke_tex.py -- jangan disunting tangan.
+\begin{table}[H]
+\centering
+\caption{\emph{Strong scaling} OpenMP: \emph{speedup} $S$ terhadap OpenMP 1 \emph{thread} dan efisiensi $E=S/T$, citra sintetis, Mesin B}
+\label{tab:strong}
+\footnotesize
+\begin{tabularx}{\textwidth}{L{2.1cm}r>{\raggedleft\arraybackslash}X>{\raggedleft\arraybackslash}X>{\raggedleft\arraybackslash}X>{\raggedleft\arraybackslash}X>{\raggedleft\arraybackslash}X>{\raggedleft\arraybackslash}X>{\raggedleft\arraybackslash}X>{\raggedleft\arraybackslash}X}
+\hline
+\hdr{Citra} & \hdr{$K$} & \hdr{K-M $T{=}2$} & \hdr{K-M $T{=}4$} & \hdr{K-M $T{=}8$} & \hdr{K-M $T{=}16$} & \hdr{$E$ K-M $T{=}8$} & \hdr{$E$ K-M $T{=}16$} & \hdr{Total $T{=}8$} & \hdr{Total $T{=}16$} \\ \hline
+4000$\times$3000 & 2 & 1,88\ensuremath{\times} & 3,17\ensuremath{\times} & 3,92\ensuremath{\times} & 3,01\ensuremath{\times} & 0,49 & 0,19 & 2,69\ensuremath{\times} & 2,33\ensuremath{\times} \\ \hline
+4000$\times$3000 & 4 & 1,72\ensuremath{\times} & 3,73\ensuremath{\times} & 3,86\ensuremath{\times} & 3,00\ensuremath{\times} & 0,48 & 0,19 & 2,61\ensuremath{\times} & 2,25\ensuremath{\times} \\ \hline
+1000$\times$1000 & 8 & 1,64\ensuremath{\times} & 4,10\ensuremath{\times} & 5,07\ensuremath{\times} & 2,34\ensuremath{\times} & 0,63 & 0,15 & 3,43\ensuremath{\times} & 1,90\ensuremath{\times} \\ \hline
+2000$\times$2000 & 8 & 2,24\ensuremath{\times} & 3,81\ensuremath{\times} & 4,97\ensuremath{\times} & 2,55\ensuremath{\times} & 0,62 & 0,16 & 3,92\ensuremath{\times} & 2,16\ensuremath{\times} \\ \hline
+4000$\times$3000 & 8 & 1,90\ensuremath{\times} & 3,39\ensuremath{\times} & 4,72\ensuremath{\times} & 6,83\ensuremath{\times} & 0,59 & 0,43 & 3,82\ensuremath{\times} & 4,89\ensuremath{\times} \\ \hline
+7680$\times$4320 & 8 & 2,06\ensuremath{\times} & 3,03\ensuremath{\times} & 4,88\ensuremath{\times} & 4,34\ensuremath{\times} & 0,61 & 0,27 & 3,78\ensuremath{\times} & 3,49\ensuremath{\times} \\ \hline
+4000$\times$3000 & 16 & 1,87\ensuremath{\times} & 3,01\ensuremath{\times} & 4,96\ensuremath{\times} & 6,57\ensuremath{\times} & 0,62 & 0,41 & 4,36\ensuremath{\times} & 5,49\ensuremath{\times} \\ \hline
+\end{tabularx}
+\par\smallskip\footnotesize\raggedright K-M = tahap K-Means saja; Total = \kode{total\_ms} (termasuk baca PNG serial). Basis = \kode{L2 omp x1}, bukan L0. Sumber: \kode{docs/BENCH\_scaling\_mesin\_wisam.md} bagian 3 (dihitung ulang dari CSV).
+\end{table}

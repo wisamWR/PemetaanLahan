@@ -1,0 +1,130 @@
+% preamble.tex - gaya laporan, disalin dari main.tex template proposal
+% (Proposal_Color_Quantizer.zip); satu-satunya perubahan: jarak sebelum judul bab (\titlespacing*{\chapter}).
+% Tambahan khusus laporan ada di bagian paling bawah.
+% Jangan menambah \usepackage: MiKTeX memakai AutoInstall, paket baru bisa terunduh diam-diam.
+
+% ===================== PAKET =====================
+\usepackage[a4paper,top=3cm,bottom=3cm,left=3cm,right=2.5cm]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{mathptmx}
+\renewcommand{\ttdefault}{lmtt}
+\usepackage{textcomp}
+\usepackage{graphicx}
+\usepackage[table]{xcolor}
+\usepackage{listings}
+\usepackage{upquote}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{titletoc}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{amsmath}
+\usepackage{float}
+\usepackage[section,above,below]{placeins}
+% Gambar boleh bergeser ke halaman berikutnya agar sisa halaman terisi teks
+\renewcommand{\topfraction}{0.9}
+\renewcommand{\bottomfraction}{0.8}
+\renewcommand{\textfraction}{0.07}
+\renewcommand{\floatpagefraction}{0.75}
+\setcounter{topnumber}{3}
+\setcounter{bottomnumber}{2}
+\setcounter{totalnumber}{5}
+\makeatletter
+\setlength{\@fptop}{0pt}
+\setlength{\@fpsep}{14pt}
+\makeatother
+\usepackage{caption}
+\usepackage{setspace}
+\usepackage{indentfirst}
+\usepackage{microtype}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta}
+\usepackage[hidelinks]{hyperref}
+
+\graphicspath{{gambar/}}
+
+% ===================== GAYA JUDUL (BAB I, I.1, ...) =====================
+\renewcommand{\thechapter}{\Roman{chapter}}
+\renewcommand{\thesection}{\thechapter.\arabic{section}}
+\renewcommand{\thesubsection}{\thesection.\arabic{subsection}}
+\setcounter{secnumdepth}{2}
+\setcounter{tocdepth}{1}
+
+\titleformat{\chapter}[display]{\normalfont\normalsize\bfseries\centering}{BAB \thechapter}{10pt}{}
+\titleformat{name=\chapter,numberless}[block]{\normalfont\normalsize\bfseries\centering}{}{0pt}{}
+% Template proposal memakai 1.2cm (judul bab turun ke sekitar 5,1 cm dari tepi atas);
+% laporan memakai 0pt (keputusan Ridlo 28 Nov) agar judul bab sekitar 4 cm dari tepi atas.
+\titlespacing*{\chapter}{0pt}{0pt}{8pt}
+\titleformat{\section}{\normalfont\normalsize\bfseries}{\thesection.}{0.4em}{}
+\titlespacing*{\section}{0pt}{10pt}{2pt}
+\titleformat{\subsection}{\normalfont\normalsize\bfseries}{\thesubsection.}{0.4em}{}
+\titlespacing*{\subsection}{0pt}{8pt}{2pt}
+
+% ===================== DAFTAR ISI =====================
+\renewcommand{\contentsname}{DAFTAR ISI}
+\newcommand{\titiktoc}{\titlerule*[0.42em]{.}}
+\newcommand{\namabab}{BAB}
+\contentsmargin{0pt}
+\titlecontents{chapter}[0pt]{}
+  {\namabab\ \thecontentslabel\titiktoc\thecontentspage\endgraf\noindent}
+  {}
+  {\titiktoc\thecontentspage}
+\titlecontents{section}[1.2em]{}
+  {\thecontentslabel.\enspace}
+  {}
+  {\titiktoc\thecontentspage}
+
+% ===================== GAMBAR, TABEL, LISTING =====================
+\renewcommand{\figurename}{Gambar}
+\renewcommand{\tablename}{Tabel}
+\renewcommand{\lstlistingname}{Listing}
+\captionsetup{font=normalsize,labelfont=normalfont,labelsep=period,justification=centering,skip=6pt}
+
+\definecolor{hijauhdr}{RGB}{226,239,217}
+\definecolor{garistabel}{RGB}{166,166,166}
+\definecolor{latarkode}{RGB}{245,245,245}
+\arrayrulecolor{garistabel}
+\newcommand{\hdr}[1]{\cellcolor{hijauhdr}\textbf{#1}}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+
+\newcommand{\kode}[1]{\texttt{\small #1}}
+
+% Penanda bagian yang wajib diisi kelompok (cari "\isi" sebelum submit)
+\newcommand{\isi}[1]{\textcolor{red}{[#1]}}
+
+\setlength{\parindent}{1.25cm}
+\setlength{\parskip}{6pt}
+\setstretch{1.15}
+\emergencystretch=3em
+\clubpenalty=10000
+\widowpenalty=10000
+\renewcommand{\arraystretch}{1.35}
+\setlist{topsep=2pt,itemsep=2pt,parsep=0pt}
+
+% ===================== TAMBAHAN LAPORAN =====================
+% Daftar Gambar dan Daftar Tabel, gaya sama dengan daftar isi.
+\renewcommand{\listfigurename}{DAFTAR GAMBAR}
+\renewcommand{\listtablename}{DAFTAR TABEL}
+\titlecontents{figure}[0pt]{}
+  {\figurename~\thecontentslabel.\enspace}
+  {}
+  {\titiktoc\thecontentspage}
+\titlecontents{table}[0pt]{}
+  {\tablename~\thecontentslabel.\enspace}
+  {}
+  {\titiktoc\thecontentspage}
+
+% Nomor persamaan "(II.3)", gambar "III.1", dan tabel "IV.1" mengikuti nomor bab Romawi.
+\renewcommand{\theequation}{\thechapter.\arabic{equation}}
+\renewcommand{\thefigure}{\thechapter.\arabic{figure}}
+\renewcommand{\thetable}{\thechapter.\arabic{table}}
+
+% Warna simpul gambar alur (sama dengan Gambar III.1 proposal): serial, OpenMP, CUDA.
+\definecolor{simpulserial}{RGB}{242,242,242}
+\definecolor{simpulomp}{RGB}{226,239,217}
+\definecolor{simpulcuda}{RGB}{252,228,214}
+
+% Pustaka TikZ tambahan (bagian dari pgf, tidak butuh paket baru) untuk kotak program pada Gambar III.1.
+\usetikzlibrary{fit,backgrounds}

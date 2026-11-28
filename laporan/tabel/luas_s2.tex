@@ -1,0 +1,18 @@
+% DIBUAT OLEH laporan/skrip/tabel_ke_tex.py -- jangan disunting tangan.
+\begin{table}[H]
+\centering
+\caption{Persentase dan luas per kelas, Sentinel-2 T49MDM 2048$\times$2048 px, $K=8$}
+\label{tab:luass2}
+\small
+\begin{tabularx}{\textwidth}{L{2.9cm}Y>{\raggedleft\arraybackslash}p{2.1cm}>{\raggedleft\arraybackslash}p{1.6cm}>{\raggedleft\arraybackslash}p{1.9cm}}
+\hline
+\hdr{Kelas} & \hdr{Kelompok (\emph{centroid} R,G,B)} & \hdr{Piksel} & \hdr{Persen} & \hdr{Luas (ha)} \\ \hline
+Vegetasi & 2 (114,125,113), 5 (126,134,120), 6 (144,145,129) & 1.945.270 & 49,58\% & 19.452,70 \\ \hline
+Lahan terbuka & 0 (186,170,153), 3 (211,191,172) & 1.074.523 & 27,38\% & 10.745,23 \\ \hline
+Lahan terbangun & 1 (246,239,228) & 114.105 & 2,91\% & 1.141,05 \\ \hline
+Lainnya & 4 (164,157,140) & 789.986 & 20,13\% & 7.899,86 \\ \hline
+\textbf{Total valid} &  & 3.923.884 & 100,00\% & 39.238,84 \\ \hline
+\emph{Nodata} (dikecualikan) & 7 (0,0,0) & 270.420 & 6,45\% & 2.704,20 \\ \hline
+\end{tabularx}
+\par\smallskip\footnotesize\raggedright Persen kelas dihitung dari piksel valid; persen \emph{nodata} dari seluruh citra. 1 piksel = 10 m $\times$ 10 m. Nama kelas diberikan manual dari warna \emph{centroid} dan kenampakan visual (bukan klasifikasi terverifikasi). Sumber: \kode{laporan/hasil\_s2/} (\kode{counts.json}, \kode{meta\_cpu.json}, \kode{kelas.json}); Mesin C.
+\end{table}

@@ -1,0 +1,231 @@
+% bab5.tex - Hasil dan Pembahasan (Sesi B, L4-L5).
+% Aturan: semua angka kinerja berasal dari tabel/*.tex dan makro tabel/angka.tex yang dibuat
+% skrip/tabel_ke_tex.py dari bench/results/*.csv; JANGAN mengetik angka kinerja di berkas ini.
+% Satu tabel satu mesin; data sintetis selalu ditandai; total_ms tanpa pemanasan CUDA, Proses dengan pemanasan.
+\chapter{HASIL DAN PEMBAHASAN}
+
+\section{Lingkungan dan Data Uji}
+\label{sec:lingkungan}
+Pengukuran dilakukan di tiga komputer anggota kelompok (Tabel~\ref{tab:mesin}). Agar angka tidak tercampur, setiap tabel di bab ini hanya memuat hasil dari satu mesin. Seluruh angka kinerja utama berasal dari Mesin B. Mesin A hanya dipakai untuk profil L0 sebagai pembanding, sedangkan Mesin C dipakai untuk uji fungsional aplikasi dengan citra Sentinel-2.
+
+\begin{table}[H]
+\centering
+\caption{Mesin uji dan eksperimen yang dijalankan di masing-masing mesin}
+\label{tab:mesin}
+\small
+\begin{tabularx}{\textwidth}{L{1.6cm}YY}
+\hline
+\hdr{Mesin} & \hdr{Spesifikasi} & \hdr{Eksperimen} \\ \hline
+A & Intel Core i7-1065G7 (4 inti, 8 \emph{thread}), RAM 16 GB; WSL 2, GCC 11.4 & Profil L0 (Tabel~\ref{tab:l0a}), hanya sebagai pembanding \\ \hline
+B & Intel Core i7-13620H (16 CPU logis di WSL), NVIDIA RTX 3050 6 GB Laptop (\kode{sm\_86}, \emph{driver} 576.93), RAM WSL 7,6 GiB; WSL 2 Ubuntu 24.04, CUDA 12.9, GCC 13.3; skema daya \emph{Balanced} & Semua \emph{benchmark} kinerja: per tahap, optimasi bertahap, \emph{strong}/\emph{weak scaling}, varian CUDA, ambang mode otomatis \\ \hline
+C & Intel Core i7-13650HX, NVIDIA RTX 3050 6 GB Laptop; WSL 2 Ubuntu 24.04 & Uji fungsional Sentinel-2, verifikasi \kode{cmp}, tangkapan layar aplikasi. Waktunya bukan hasil kinerja resmi \\ \hline
+\end{tabularx}
+\par\smallskip\footnotesize\raggedright Sumber: \kode{bench/results/run\_20261127\_1634\_env.txt} dan \kode{bench/BENCH\_GPU.md} (B), \kode{docs/PROFIL\_L0.md} (A), \kode{meta.json} \emph{run} Sentinel-2 (C).
+\end{table}
+
+\textbf{Data uji.} Ada dua jenis citra:
+\begin{itemize}
+    \item \textbf{Citra sintetis} (\kode{sintetis\_lanskap\_\textless lebar\textgreater x\textless tinggi\textgreater}) yang dibangkitkan skrip \emph{benchmark}, berukuran 1000$\times$1000, 2000$\times$2000, 4000$\times$3000, dan 7680$\times$4320 piksel untuk pengukuran utama; 320$\times$320 sampai 4000$\times$3000 untuk penentuan ambang; dan 2000$\times$1000 sampai 32000$\times$1000 untuk \emph{weak scaling}. Varian CUDA diukur pada citra acak. \textbf{Semua angka kinerja di Subbab~\ref{sec:profil} sampai~\ref{sec:hasilambang} berasal dari citra sintetis.}
+    \item \textbf{Citra Sentinel-2} \emph{tile} T49MDM (\kode{S2B\_MSIL2A\_20261017}), kanal B04/B03/B02, berupa potongan 512, 1024, dan 2048 piksel persegi. Citra ini dipakai untuk uji fungsional dan verifikasi (Subbab~\ref{sec:hasilverifikasi} dan~\ref{sec:hasilsentinel}).
+\end{itemize}
+
+\textbf{Prosedur.} Setiap konfigurasi dijalankan satu kali sebagai pemanasan (dibuang), lalu lima kali; yang dilaporkan adalah median. Semua \emph{run} memakai 20 iterasi dan \emph{seed} 42. Waktu diambil dari \kode{timing.json} keluaran \kode{landcover} (Subbab~\ref{sec:kontrak}). \textbf{Total} adalah \kode{total\_ms}, yaitu baca + K-Means + pewarnaan + tulis, tanpa pemanasan konteks CUDA. \textbf{Proses} adalah waktu dinding satu proses \kode{landcover} (\kode{wall\_ms}) yang mencakup pemanasan itu. Keduanya disajikan karena aplikasi menjalankan \kode{landcover} sebagai proses baru di setiap \emph{run}, sehingga pengguna merasakan Proses, bukan Total. Pada sesi Mesin B yang merekamnya (\emph{run} 16:34 dan sesi ambang), pemanasan konteks CUDA berkisar \WarmMin--\WarmMax~ms per proses.
+
+\textbf{Penyimpangan dari rencana proposal.}
+\begin{enumerate}
+    \item Median dari 5 ulangan, bukan minimal 10.
+    \item Ukuran citra 1000$^2$, 2000$^2$, 4000$\times$3000, dan 7680$\times$4320, bukan 2048$^2$, 4096$^2$, 8192$^2$, dan satu \emph{tile} penuh. \emph{Tile} penuh 10980$\times$10980 tidak tersedia (Subbab~\ref{sec:batasan}).
+    \item \emph{Profiling} memakai pengukur waktu per tahap di dalam program dan CUDA \emph{events}, bukan \kode{perf}/\kode{gprof}; Nsight (\kode{nsys}/\kode{ncu}) tidak terpasang di mesin uji.
+    \item Mesin uji adalah laptop anggota kelompok (Tabel~\ref{tab:mesin}), bukan mesin pada rencana proposal.
+    \item Tahap baca PNG tetap serial di semua mode (Tabel~\ref{tab:penempatan}).
+\end{enumerate}
+
+\section{Profiling L0 dan \emph{Bottleneck}}
+\label{sec:profil}
+Tabel~\ref{tab:l0b} menunjukkan waktu setiap tahap pada mode CPU saja (L0, \kode{kmeans\_cpu} satu \emph{thread}) di Mesin B. Pada semua ukuran dan nilai $K$ yang diukur, K-Means adalah tahap terbesar dengan porsi \PorsiKMLoMin--\PorsiKMLoMax{} dari Total. Porsinya membesar seiring $K$, karena biaya \emph{assignment} sebanding dengan $N\times K$, sedangkan baca dan tulis PNG hanya bergantung pada jumlah piksel dan isi citra. Tahap inisialisasi praktis nol karena hanya memilih $K$ \emph{centroid} awal.
+
+\input{tabel/l0_mesinb}
+
+Pola yang sama muncul di Mesin A (Tabel~\ref{tab:l0a}): porsi K-Means \PorsiKMAMin--\PorsiKMAMax. Waktu mutlak kedua mesin berbeda dan tidak dibandingkan. Yang penting adalah kesimpulannya sama di dua mesin: K-Means adalah \emph{bottleneck} utama L0, sehingga menjadi sasaran pertama L1 (CUDA) dan L2 (OpenMP). Sesudah K-Means, tahap berikutnya yang terbesar adalah tulis dan baca PNG.
+
+\input{tabel/l0_mesina}
+
+\section{Optimasi Bertahap}
+\label{sec:bertahap}
+Tabel~\ref{tab:bertahapk8} membandingkan langkah optimasi pada $K=8$ untuk empat ukuran citra. Untuk L2 dan L1+L2, yang ditampilkan adalah jumlah \emph{thread} OpenMP dengan Total terkecil. Gambar~\ref{fig:tahap} menampilkan komposisi tahap pada citra terbesar.
+
+\input{tabel/bertahap_k8}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\textwidth]{tahap_7680x4320_k8.png}
+\caption{Waktu per tahap pada citra sintetis 7680$\times$4320, $K=8$, Mesin B (median, ms). Sumber: \kode{docs/fig/mesinWisam/}, dibuat \kode{bench/analyze\_scaling.py}}
+\label{fig:tahap}
+\end{figure}
+
+Pada 7680$\times$4320 dengan $K=8$, Total turun dari \LoTotalDelapan~ms (L0) menjadi \LdLdTotalDelapan~ms pada L1+L2 (\LdLdCfgDelapan), atau \LdLdSTotalDelapan. Kontribusi setiap langkah adalah sebagai berikut:
+\begin{itemize}
+    \item \textbf{L1 (CUDA).} K-Means turun dari \LoKMDelapan{} menjadi \LdKMDelapan~ms (\LdSKMDelapan), tetapi Total hanya membaik \LdSTotalDelapan. Penyebabnya, waktu di luar K-Means (Total dikurangi K-Means) hampir tidak berubah: \LuarLoDelapan~ms pada L0 dan \LuarLdDelapan~ms pada L1.
+    \item \textbf{L2 (OpenMP).} Sendirian, L2 (\LdbCfgDelapan) memberi \LdbSTotalDelapan{} pada Total. Kontribusi terbesarnya justru pada kombinasi dengan L1, karena L2 juga memparalelkan pewarnaan dan tulis PNG.
+    \item \textbf{L1+L2.} Waktu di luar K-Means turun menjadi \LuarLdLdDelapan~ms; tulis PNG saja turun dari \TulisLoDelapan{} menjadi \TulisLdLdDelapan~ms. Sisanya didominasi baca PNG (\BacaLdLdDelapan~ms, \PorsiBacaLdLdDelapan{} dari Total), yang tetap serial.
+\end{itemize}
+
+\input{tabel/bertahap_k}
+
+\textbf{Total dan Proses.} Tabel~\ref{tab:bertahapk} memuat empat nilai $K$ pada 4000$\times$3000, satu-satunya ukuran yang Prosesnya terekam. Menurut Total, L1+L2 selalu paling cepat. Menurut Proses, pemanasan konteks CUDA menutup sebagian besar keuntungan GPU. Pada $K=8$, L1+L2 (\LdLdCfgEmpat) memberi \LdLdSTotalEmpat{} menurut Total tetapi hanya \LdLdSProsesEmpat{} menurut Proses. Konfigurasi Optimalisasi tercepat menurut Proses memberi \emph{speedup} \SProsesTerbaikKDua{} ($K=2$, \CfgProsesTerbaikKDua), \SProsesTerbaikKEmpat{} ($K=4$, \CfgProsesTerbaikKEmpat), \SProsesTerbaikKDelapan{} ($K=8$, \CfgProsesTerbaikKDelapan), dan \SProsesTerbaikKEnambelas{} ($K=16$, \CfgProsesTerbaikKEnambelas). Pada $K=2$, OpenMP tanpa GPU bahkan menjadi pilihan tercepat menurut Proses. Inilah dasar pemilihan mode otomatis (Subbab~\ref{sec:hasilambang}).
+
+\section{\emph{Strong} dan \emph{Weak Scaling} OpenMP}
+\label{sec:scaling}
+\textbf{\emph{Strong scaling}.} Tabel~\ref{tab:strong} dan Gambar~\ref{fig:strong} memakai OpenMP satu \emph{thread} sebagai basis, bukan L0, agar \emph{overhead} OpenMP tidak tercampur ke dalam efisiensi. \emph{Speedup} K-Means naik sampai 8 \emph{thread} pada semua ukuran, dengan efisiensi yang turun. Dari 8 ke 16 \emph{thread}, hasilnya bergantung pada ukuran dan sesi ukur: 16 \emph{thread} lebih cepat daripada 8 \emph{thread} hanya pada \JmlEnambelasMenang{} dari \JmlStrong{} konfigurasi, yaitu \DaftarEnambelasMenang, yang keduanya berasal dari \emph{run} 16:34. Pada 7680$\times$4320, $K=8$, \emph{speedup} K-Means adalah \StrongDelapanTd{} dengan 8 \emph{thread} dan \StrongDelapanTe{} dengan 16 \emph{thread}. Karena itu, 8 \emph{thread} tidak bisa digeneralisasi sebagai jumlah terbaik, dan 16 \emph{thread} juga tidak.
+
+Penyebab turunnya efisiensi di atas 8 \emph{thread} \textbf{tidak diukur}. Dugaan yang belum diuji: 16 CPU logis di WSL adalah \emph{hyperthread} yang berbagi inti fisik, dan \emph{bandwidth} memori menjadi batas. \emph{Speedup} Total selalu lebih kecil daripada \emph{speedup} K-Means, karena baca PNG serial tidak ikut menskala (Hukum Amdahl, Persamaan~\ref{eq:amdahl}).
+
+\input{tabel/strong}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{strong_kmeans_k8.png}
+\caption{\emph{Speedup} dan efisiensi K-Means OpenMP (\emph{strong scaling}), $K=8$, citra sintetis, Mesin B. Garis putus-putus = ideal}
+\label{fig:strong}
+\end{figure}
+
+\textbf{\emph{Weak scaling}.} Pada \emph{weak scaling} (Tabel~\ref{tab:weak}, Gambar~\ref{fig:weak}), beban per \emph{thread} dibuat tetap, sesuai sudut pandang Gustafson \cite{gustafson1988}. Efisiensi K-Means pada $K=8$ masih \WeakKMDua{} dengan 2 \emph{thread}, lalu turun menjadi \WeakKMDelapan{} dengan 8 \emph{thread} dan \WeakKMEnambelas{} dengan 16 \emph{thread}. Efisiensi Total pada 16 \emph{thread} lebih rendah lagi (\WeakTotEnambelas), karena waktu baca PNG serial tumbuh bersama ukuran citra. Jadi menambah \emph{thread} di mesin ini tidak cukup untuk menjaga waktu tetap ketika citra membesar.
+
+\input{tabel/weak}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.55\textwidth]{weak_kmeans.png}
+\caption{Efisiensi \emph{weak scaling} K-Means OpenMP, citra sintetis, Mesin B}
+\label{fig:weak}
+\end{figure}
+
+\section{Kinerja CUDA}
+\label{sec:hasilcuda}
+\textbf{Rincian waktu.} Tabel~\ref{tab:cudarinci} memecah tahap K-Means CUDA menjadi salin ke GPU (h2d), \emph{kernel}, dan salin kembali (d2h). Pada 7680$\times$4320, $K=8$, rinciannya adalah h2d \HdDelapan~ms, \emph{kernel} \KernelDelapan~ms, dan d2h \DdhDelapan~ms. Pada semua baris, d2h lebih lama daripada h2d (\RasioDdhHdMin--\RasioDdhHdMax). Sebagian selisih ini sesuai dengan ukuran data: label dikirim balik sebagai \kode{int32} (4 \emph{byte} per piksel), sedangkan citra dikirim sebagai 3 \emph{byte} per piksel, atau rasio 4/3. Rasio yang terukur lebih besar daripada itu, dan penyebab sisanya \textbf{tidak diukur} (tanpa Nsight). Transfer hanya terjadi sekali di awal dan sekali di akhir (Subbab~\ref{sec:cuda}), tetapi pada citra besar porsinya tetap besar dibandingkan \emph{kernel} 20 iterasi. Pemanasan konteks CUDA hanya terekam pada 4000$\times$3000; di sana pemanasan lebih lama daripada seluruh tahap K-Means untuk keempat nilai $K$.
+
+\input{tabel/cuda_rinci}
+
+\textbf{Pengaruh $K$.} Pada 4000$\times$3000 (Tabel~\ref{tab:pengaruhk}), K-Means L0 tumbuh \RasioKLo{} dari $K=2$ ke $K=16$, mendekati linear terhadap $K$. K-Means CUDA hampir datar (\RasioKCuda). Tabel~\ref{tab:cudarinci} menunjukkan bahwa waktu \emph{kernel} sendiri juga hampir tidak berubah terhadap $K$ (\KernelKMin--\KernelKMax~ms untuk $K=2$ sampai 16). Dugaan yang \textbf{tidak diukur}: \emph{kernel} dibatasi akses memori (membaca citra dan menulis label), bukan perhitungan jarak yang sebanding dengan $K$. Akibatnya, \emph{speedup} K-Means CUDA membesar bersama $K$ dan mencapai \LdSKMEnambelas{} pada $K=16$.
+
+\input{tabel/pengaruh_k}
+
+\textbf{\emph{Throughput}.} Tabel~\ref{tab:throughput} menunjukkan bahwa CUDA memproses \TpCudaMin--\TpCudaMax~ns per piksel per iterasi pada $K=8$ di semua ukuran. Angka yang datar ini berarti waktu K-Means CUDA tumbuh linear terhadap jumlah piksel pada rentang yang diukur.
+
+\input{tabel/throughput}
+
+\textbf{Varian \emph{kernel}.} Tabel~\ref{tab:variancuda} membandingkan tiga varian pada tahap K-Means saja, diukur dengan \kode{tests/bench\_cuda} di luar \kode{landcover}. Reduksi di \emph{shared memory} (T4) \TempatTigaMin--\TempatTigaMax{} lebih cepat daripada \kode{atomicAdd} global (T3). Hasil ini sesuai dengan alasan rancangan T4 (Subbab~\ref{sec:cuda}): pada T3 semua \emph{thread} menulis ke akumulator global yang sama, sedangkan T4 menjumlahkan dulu per \emph{block}. Penyebab ini tidak diprofilkan. Varian \emph{streams} dengan \emph{pinned memory} (T5) \LimaEmpatMin--\LimaEmpatMax{} lebih lambat daripada T4 pada semua ukuran yang diukur. Dugaan yang \textbf{tidak diukur}: tumpang tindih transfer pada T5 hanya terjadi di iterasi pertama dan terakhir (Subbab~\ref{sec:bersamaan}), sehingga keuntungannya tidak menutup biaya pembagian potongan dan sinkronisasi \emph{stream}. Pengaruh T5 pada \emph{pipeline} utuh \textbf{tidak diukur}, karena \kode{landcover} hanya memanggil T4.
+
+\input{tabel/varian_cuda}
+
+\section{Ambang Mode Otomatis}
+\label{sec:hasilambang}
+Tabel~\ref{tab:ambang} membandingkan OpenMP dan CUDA pada \AmbJumlah{} konfigurasi (citra sintetis $N$ sampai \AmbNMax{} juta piksel, $K$ = 4, 8, 16). Menurut Total, CUDA unggul pada \AmbCudaTotal{} dari \AmbJumlah{} konfigurasi. Menurut Proses, CUDA hanya unggul pada \AmbCudaProses{} konfigurasi, karena pemanasan konteks CUDA (\AmbWarmMin--\AmbWarmMax~ms pada sesi ini) lebih besar daripada keuntungan K-Means pada citra kecil dan $K$ kecil.
+
+\input{tabel/ambang}
+
+Aturan yang diuji:
+\begin{itemize}
+    \item \textbf{Aturan lama} ($N\geq100.000$ piksel, diturunkan dari Total) memilih yang tercepat menurut Proses hanya pada \AmbLamaBenarProses{} dari \AmbJumlah{} konfigurasi, dengan kerugian \AmbLamaRugi~ms.
+    \item \textbf{Selalu OpenMP} benar pada \AmbOmpBenarProses{} konfigurasi, dengan kerugian \AmbOmpRugi~ms.
+    \item \textbf{Aturan baru} $N\times K\geq70$ juta (Persamaan~\ref{eq:ambang}) benar pada \AmbBaruBenarProses{} dari \AmbJumlah{} konfigurasi, dengan kerugian \AmbBaruRugi~ms.
+\end{itemize}
+Aturan baru memakai $N\times K$, bukan $N$ saja, karena waktu K-Means OpenMP sebanding dengan $N\times K$, sedangkan K-Means CUDA hampir tidak bergantung pada $K$ (Tabel~\ref{tab:pengaruhk}). Aturan ini hanya berlaku untuk mesin, data, dan cara pemanggilan yang diukur. Bila aplikasi kelak memakai proses CUDA yang menetap, sehingga pemanasan dibayar sekali, ambang harus dihitung ulang dengan Total.
+
+\section{Verifikasi Hasil Identik}
+\label{sec:hasilverifikasi}
+Tabel~\ref{tab:verifikasi} merangkum semua pemeriksaan kesamaan hasil antarmode. Pemeriksaan pada kolom ``Identik'' \emph{benchmark} hanya membandingkan \emph{centroid} dan \emph{counts}. Kesamaan label per piksel dibuktikan oleh program uji inti dan oleh \kode{cmp} pada \kode{labels.u8}.
+
+\begin{table}[H]
+\centering
+\caption{Ringkasan verifikasi hasil identik antarmode}
+\label{tab:verifikasi}
+\small
+\begin{tabularx}{\textwidth}{L{3.3cm}YL{3.4cm}L{2.5cm}}
+\hline
+\hdr{Uji} & \hdr{Yang dibandingkan} & \hdr{Cakupan} & \hdr{Hasil} \\ \hline
+\kode{test\_ref} & Implementasi acuan C++ & Kasus uji inti & 0 kegagalan \\ \hline
+\kode{test\_cuda\_vs\_ref} & Label dan \emph{centroid} CUDA vs serial & 615 kasus (ukuran, $K$, \emph{seed}) & 615 dari 615 lulus \\ \hline
+\kode{test\_omp\_vs\_cpu} & Label dan \emph{centroid} OpenMP vs serial & Kasus uji OpenMP & Semua sama \\ \hline
+\kode{test\_png\_omp} & PNG paralel vs serial & Berkas PNG keluaran & Lulus (\emph{exit} 0) \\ \hline
+Kolom ``Identik'' \emph{benchmark} & \emph{Centroid} dan \emph{counts} vs L0 & \IdentikJumlah{} baris ringkasan \emph{benchmark} Mesin B (sintetis) & \IdentikYa{} dari \IdentikJumlah{} identik \\ \hline
+\kode{cmp} Sentinel-2 (25 Nov) & \kode{labels.u8}, \emph{centroid}, \emph{counts}: cpu vs cuda & 512, 1024, 2048 px $\times$ $K$ = 4, 8, 16 & 9 dari 9 identik \\ \hline
+\kode{cmp} Sentinel-2 (28 Nov) & \kode{labels.u8}, \emph{centroid}, \emph{counts}: cpu vs omp dan cpu vs cuda & 2048 px, $K=8$, biner \kode{main} & \CmpSama{} dari \CmpSama{} berkas identik \\ \hline
+Aplikasi (halaman Kinerja) & \kode{labels.u8} penuh, \emph{centroid}, \emph{counts} & Sentinel-2 2048 px, $K=8$ & ``Label identik 100\%'' \\ \hline
+\kode{pytest} (Windows) & Logika aplikasi & Seluruh \emph{suite} & 1000 lulus, 41 dilewati, 1 gagal* \\ \hline
+Tes biner nyata & Aplikasi + \kode{landcover} asli & Lewat pembungkus WSL & 36 lulus, 3 dilewati \\ \hline
+\end{tabularx}
+\par\smallskip\footnotesize\raggedright *Tes batas waktu 1 detik yang peka beban mesin; diulang tersendiri, lulus 3 dari 3. Tes yang dilewati hanya berlaku bila OpenMP/CUDA \emph{tidak} terhubung. Sumber: uji 28 Nov pada \kode{main} \kode{f78b5d4} (Mesin C), \kode{bench/results/*\_summary.csv}, dan \kode{laporan/hasil\_s2/cmp.txt}.
+\end{table}
+
+Hasilnya identik pada semua pemeriksaan. Ini sesuai rancangan pada Subbab~\ref{sec:konsistensi}: aritmetika integer, pembagian dibulatkan ke bawah, aturan seri yang sama, dan \emph{centroid} awal yang dihitung sekali di CPU. Karena labelnya identik, persentase dan luas setiap kelas pada kedua mode juga identik, dan selisih waktu di subbab sebelumnya murni berasal dari optimasi.
+
+\section{Hasil Aplikasi pada Sentinel-2}
+\label{sec:hasilsentinel}
+Gambar~\ref{fig:s2peta} menampilkan potongan Sentinel-2 T49MDM 2048$\times$2048 piksel (\SPiksel{} piksel) dan peta kelompok hasil K-Means dengan $K=8$, 20 iterasi, dan \emph{seed} 42. Peta ini dibuat oleh \kode{landcover} versi \kode{main}; mode cpu, omp, dan cuda menghasilkan \kode{labels.u8} yang identik (Tabel~\ref{tab:verifikasi}). Sebanyak \SNodataPiksel{} piksel (\SNodataPersen) adalah \emph{nodata} $(0,0,0)$ pada baji di tepi kanan potongan. Seluruh piksel itu jatuh ke kelompok \SKelompokNodata{} dan dikecualikan dari persen dan luas.
+
+\begin{figure}[H]
+\centering
+\begin{minipage}{0.48\textwidth}\centering
+\includegraphics[width=\textwidth]{s2_mdm2048_asli.jpg}\\[2pt]
+\small (a) Citra asli (B04/B03/B02)
+\end{minipage}\hfill
+\begin{minipage}{0.48\textwidth}\centering
+\includegraphics[width=\textwidth]{s2_mdm2048_peta_k8.png}\\[2pt]
+\small (b) Peta kelompok, $K=8$
+\end{minipage}
+\caption{Sentinel-2 T49MDM 2048$\times$2048 px dan peta hasil K-Means. Setiap piksel diwarnai dengan warna \emph{centroid} kelompoknya; gambar diperkecil menjadi 1024 px untuk laporan}
+\label{fig:s2peta}
+\end{figure}
+
+Tabel~\ref{tab:luass2} menunjukkan persentase dan luas setelah delapan kelompok diberi nama dan digabung menjadi empat kelas di halaman Pemetaan. Total luas valid adalah \SValidHa~ha. Penamaan ini dilakukan manual dari warna \emph{centroid} dan kenampakan visual, sehingga tabel ini adalah contoh keluaran aplikasi, bukan hasil klasifikasi yang tervalidasi.
+
+\input{tabel/luas_s2}
+
+Beberapa kasus sulit terlihat karena hanya tiga kanal tampak yang dipakai (tanpa NIR/SWIR):
+\begin{enumerate}
+    \item \textbf{Air dan bayangan.} Pada $K=8$ tidak terbentuk kelompok air tersendiri. Koridor sungai dan bayangan lereng masuk ke kelompok vegetasi gelap (kelompok 2 dan 5), sehingga kelas Air tidak dibuat.
+    \item \textbf{Permukiman dan tanah terbuka.} Atap terang (kelompok 1) berdekatan secara spektral dengan tanah kering dan kabut tipis (kelompok 3). Kelompok 4 mencampur lahan terasering, jalan, dan tepi vegetasi, sehingga diberi nama ``Lainnya''.
+    \item \textbf{Kelompok kosong.} Pada $K=16$ dengan \emph{seed} yang sama, beberapa \emph{centroid} awal jatuh pada piksel \emph{nodata} $(0,0,0)$. Tiga \emph{centroid} awal bernilai $(0,0,0)$; dua di antaranya (kelompok 9 dan 12) berakhir dengan nol piksel, sehingga kelompok bukan-\emph{nodata} yang berisi tinggal 13, bukan 15. Perilaku ini sah menurut kontrak (kelompok kosong dipertahankan dan ditampilkan 0\%), tetapi menunjukkan bahwa \emph{nodata} sebaiknya dikeluarkan sebelum inisialisasi bila hasil $K$ besar dibutuhkan.
+\end{enumerate}
+
+Waktu \emph{run} Sentinel-2 di Mesin C tidak dilaporkan sebagai hasil kinerja, karena hanya berupa uji fungsional (satu \emph{run} per konfigurasi, mesin berbeda, citra lebih kecil daripada citra pengukuran utama).
+
+\section{Hipotesis dan Analisis Amdahl}
+\label{sec:hipotesis}
+Tabel~\ref{tab:hipotesis} membandingkan hipotesis Subbab~\ref{sec:hipotesisawal} dengan data terdekat dari Mesin B.
+
+\begin{table}[H]
+\centering
+\caption{Hipotesis dan hasil pengukuran (Mesin B, citra sintetis, kecuali H4)}
+\label{tab:hipotesis}
+\small
+\begin{tabularx}{\textwidth}{L{3.2cm}YL{3.5cm}}
+\hline
+\hdr{Hipotesis} & \hdr{Data terdekat} & \hdr{Kesimpulan} \\ \hline
+H1: K-Means mengambil porsi terbesar pada L0 & Porsi K-Means \PorsiKMLoMin--\PorsiKMLoMax{} di Mesin B (Tabel~\ref{tab:l0b}) dan \PorsiKMAMin--\PorsiKMAMax{} di Mesin A (Tabel~\ref{tab:l0a}) & Terbukti pada kedua mesin \\ \hline
+H2a: K-Means CUDA $\geq20\times$ (4096$^2$, $K=8$) & 4096$^2$ tidak diukur. Ukuran terdekat 4000$\times$3000 (12 juta piksel, bukan 16,8 juta): \LdSKMEmpat. Semua ukuran $K=8$: \HDuaCudaMin--\HDuaCudaMax{} (Tabel~\ref{tab:bertahapk8}) & Tercapai pada ukuran terdekat \\ \hline
+H2b: K-Means OpenMP 8 \emph{thread} $\geq4\times$ & Terhadap L0, $K=8$: \HDuaOmpMin--\HDuaOmpMax{} di semua ukuran; terhadap OpenMP 1 \emph{thread} pada 4000$\times$3000: \HDuaOmpSatuEmpat. Pada 4000$\times$3000: $K=2$ \HDuaOmpKDua, $K=4$ \HDuaOmpKEmpat, $K=16$ \HDuaOmpKEnambelas & Tercapai pada $K=8$ (kondisi hipotesis); tidak tercapai pada $K\leq4$ \\ \hline
+H3: \emph{End-to-end} satu \emph{tile} penuh $\geq5\times$ & \emph{Tile} penuh tidak diukur. 7680$\times$4320, $K=8$: Total \LdLdSTotalDelapan, Proses tidak diukur. 4000$\times$3000, $K=8$: Total \LdLdSTotalEmpat, Proses \SProsesTerbaikKDelapan{} (konfigurasi tercepat); $K=16$: Proses \SProsesTerbaikKEnambelas & Tidak dapat disimpulkan untuk \emph{tile} penuh. Pada 12 juta piksel, $K=8$: tercapai menurut Total, tidak menurut Proses \\ \hline
+H4: Label identik 100\% & \kode{test\_cuda\_vs\_ref}, \kode{test\_omp\_vs\_cpu}, \kode{cmp} \kode{labels.u8} Sentinel-2 cpu vs omp vs cuda (Tabel~\ref{tab:verifikasi}) & Terbukti \\ \hline
+\end{tabularx}
+\end{table}
+
+\textbf{Analisis Amdahl.} Pada L0 7680$\times$4320, $K=8$, porsi K-Means adalah $q=\AmdP$. Bila hanya K-Means yang dipercepat tanpa batas, Persamaan~\ref{eq:amdahl} dengan fraksi serial $f=1-q$ dan $p\to\infty$ memberi batas \emph{speedup} total $1/(1-q)\approx\AmdBatas$ \cite{amdahl1967}. Hasil pengukuran sesuai dengan analisis ini:
+\begin{enumerate}
+    \item L1 saja mempercepat K-Means \LdSKMDelapan, tetapi Total hanya membaik \LdSTotalDelapan, mendekati batas \AmdBatas. Tahap lain belum disentuh, sehingga mempercepat K-Means lebih jauh hampir tidak berguna.
+    \item L1+L2 mencapai \LdLdSTotalDelapan, melampaui batas tersebut, karena L2 juga memangkas tahap di luar K-Means (pewarnaan dan tulis PNG). Dengan demikian fraksi serialnya mengecil dan batasnya bergeser. Ini menunjukkan mengapa setiap tahap perlu ditempatkan di perangkat terbaiknya, bukan hanya K-Means.
+    \item Sesudah L1+L2, K-Means tinggal \PorsiKMLdLdDelapan{} dari Total, sedangkan baca PNG serial menjadi tahap terbesar (\PorsiBacaLdLdDelapan). Bahkan bila K-Means menjadi nol, Total hanya bisa membaik \AmdBatasLdLd{} lagi. Baca PNG adalah \emph{bottleneck} berikutnya.
+\end{enumerate}
+
+\section{Batasan}
+\label{sec:batasan}
+\begin{enumerate}
+    \item \textbf{\emph{Tile} penuh tidak diuji.} Data Sentinel-2 yang tersedia hanya potongan sampai 2048 piksel; \emph{tile} 10980$\times$10980 (sekitar 120 juta piksel) tidak ada. Hasil terbesar yang diukur adalah citra sintetis 7680$\times$4320 (sekitar 33 juta piksel), dan H3 tidak dapat disimpulkan untuk \emph{tile} penuh.
+    \item \textbf{Kinerja hanya pada citra sintetis.} Waktu baca dan tulis PNG bergantung pada isi citra (kompresi), sehingga angka baca/tulis citra sintetis tidak otomatis berlaku untuk citra satelit.
+    \item \textbf{L3 hanya di tingkat \emph{kernel}.} Varian \emph{streams} diukur dengan \kode{tests/bench\_cuda} dan tidak dipanggil \kode{landcover}. Pemrosesan banyak wilayah sekaligus belum dibuat.
+    \item \textbf{Proses tidak lengkap.} Waktu dinding proses hanya terekam pada sesi 4000$\times$3000 dan sesi ambang; untuk 1000$^2$, 2000$^2$, dan 7680$\times$4320 hanya Total yang tersedia.
+    \item \textbf{Satu mesin acuan dan lima ulangan.} Semua angka kinerja berasal dari satu laptop (Mesin B) dengan skema daya \emph{Balanced} dan median lima ulangan. Dua sesi ukur di mesin yang sama tidak menghasilkan angka yang identik, sehingga selisih kecil antarkonfigurasi (misalnya 8 dan 16 \emph{thread}) belum tentu bermakna.
+    \item \textbf{Tanpa Nsight.} Penyebab turunnya efisiensi OpenMP di atas 8 \emph{thread} dan rincian \emph{kernel} CUDA tidak diprofilkan.
+    \item \textbf{Segmentasi tanpa pengawasan.} Hasil aplikasi adalah segmentasi awal dari tiga kanal tampak, bukan klasifikasi tutupan lahan yang akurat. Penamaan kelas manual dan tidak divalidasi dengan data lapangan.
+\end{enumerate}

@@ -1,0 +1,43 @@
+% main.tex - Laporan Akhir Project "Pemetaan Cepat Tutupan Lahan".
+% Kompilasi dari folder laporan/:  latexmk -pdf main.tex   (atau pdflatex tiga kali)
+% Gaya diambil dari template proposal (preamble.tex); isi tiap bab ada di bab/.
+% Makro penanda \isi (teks merah, preamble.tex) menandai bagian yang belum diisi; PDF final tidak memuatnya lagi.
+\documentclass[12pt,a4paper]{report}
+
+\input{preamble}
+% Angka hasil untuk teks Bab V-VI, dibuat skrip/tabel_ke_tex.py (jangan disunting tangan).
+\input{tabel/angka}
+
+\begin{document}
+
+\input{sampul}
+
+% ===================== DAFTAR ISI, GAMBAR, TABEL =====================
+\pagenumbering{roman}
+\assignpagestyle{\chapter}{empty}
+\pagestyle{empty}
+\begingroup
+\setlength{\parskip}{0pt}
+\fontsize{11}{13.2}\selectfont
+\tableofcontents
+\clearpage
+\listoffigures
+\clearpage
+\listoftables
+\endgroup
+\clearpage
+\assignpagestyle{\chapter}{plain}
+\pagestyle{plain}
+\pagenumbering{arabic}
+
+% ===================== ISI =====================
+\include{bab/bab1}
+\include{bab/bab2}
+\include{bab/bab3}
+\include{bab/bab4}
+\include{bab/bab5}
+\include{bab/bab6}
+\include{bab/pustaka}
+\include{bab/lampiran}
+
+\end{document}

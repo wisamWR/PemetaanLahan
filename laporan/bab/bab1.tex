@@ -1,0 +1,56 @@
+% bab1.tex - Pendahuluan (dari proposal Bab I; I.6 diperbarui sesuai implementasi).
+\chapter{PENDAHULUAN}
+
+\section{Latar Belakang}
+Peta tutupan lahan menunjukkan sebaran vegetasi, badan air, lahan terbangun, dan lahan terbuka pada suatu wilayah. Peta ini dibutuhkan untuk perencanaan wilayah, pemantauan lingkungan, dan penilaian cepat setelah bencana seperti banjir atau kebakaran lahan. Sumber datanya kini mudah diperoleh: satelit Sentinel-2 menyediakan citra warna asli beresolusi 10 meter secara gratis, dengan ukuran satu \emph{tile} $10980\times10980$ piksel atau sekitar 120 juta piksel \cite{esa2015}. Citra drone (ortofoto) juga berukuran puluhan hingga ratusan megapiksel.
+
+Sebelum klasifikasi rinci atau survei lapangan, analis lingkungan dan perencana wilayah sering membutuhkan peta awal yang cepat: berapa persen wilayah berupa vegetasi, air, lahan terbangun, dan lahan terbuka. Peta awal seperti ini dapat dibuat dengan klasifikasi tanpa pengawasan (\emph{unsupervised}) menggunakan K-Means \cite{richards2022}. K-Means adalah algoritma \emph{machine learning} yang mengelompokkan setiap piksel berdasarkan warnanya ke dalam $K$ kelompok (\emph{cluster}). Analis kemudian memberi nama setiap kelompok, dan luas tiap kelas dihitung dari jumlah pikselnya.
+
+Masalahnya, proses ini lambat bila seluruhnya dijalankan di CPU secara serial. K-Means pada satu \emph{tile} Sentinel-2 dengan $K=8$ dan 20 iterasi membutuhkan sekitar 19 miliar perhitungan jarak. Selain itu, aplikasi juga harus membaca citra berukuran ratusan megabyte, mewarnai peta, dan menulis hasilnya. Padahal analis biasanya perlu mencoba beberapa nilai $K$ dan beberapa wilayah sampai petanya masuk akal, sehingga waktu tunggu menumpuk dan proses tidak lagi interaktif.
+
+Setiap tahap dalam alur ini memiliki karakter yang berbeda. K-Means bersifat komputasi berat dan paralel per piksel sehingga cocok untuk GPU, sedangkan baca/tulis citra dan pewarnaan peta lebih cocok dikerjakan oleh CPU \emph{multicore}. Karena itu proyek ini membangun aplikasi pemetaan tutupan lahan yang dioptimalkan per tahap: setiap tahap ditempatkan pada perangkat yang kinerjanya paling baik untuk tahap tersebut, yaitu CPU serial, CPU \emph{multicore} dengan OpenMP, atau GPU dengan CUDA. Penempatan ini ditentukan berdasarkan analisis \emph{bottleneck} terhadap versi CPU saja, dan peningkatannya dibuktikan dengan membandingkan kinerja sebelum dan sesudah setiap langkah optimasi.
+
+\section{Rumusan Masalah}
+\begin{enumerate}
+    \item Bagaimana menghasilkan peta awal tutupan lahan dari citra satelit beresolusi tinggi (satu \emph{tile} Sentinel-2, sekitar 120 juta piksel) dengan cukup cepat agar analis dapat mencoba beberapa nilai $K$ secara interaktif?
+    \item Tahap mana yang menjadi \emph{bottleneck} pada versi CPU saja, dan bagaimana setiap tahap ditempatkan pada CPU serial, OpenMP, atau CUDA sesuai kinerja terbaiknya?
+    \item Seberapa besar peningkatan kinerja \emph{end-to-end} mode optimalisasi dibandingkan versi CPU saja, berapa sumbangan setiap langkah optimasi, dan apakah peta hasilnya tetap identik?
+\end{enumerate}
+
+\section{Tujuan}
+\begin{enumerate}
+    \item Membangun aplikasi pemetaan tutupan lahan yang menerima citra satelit, mengelompokkan piksel dengan K-Means, lalu menampilkan peta kelas beserta persentase dan luas setiap kelas.
+    \item Menyediakan dua mode eksekusi: mode CPU saja (serial) sebagai \emph{baseline}, dan mode optimalisasi yang membagi setiap tahap ke CPU serial, OpenMP, atau CUDA.
+    \item Mengidentifikasi \emph{bottleneck} melalui \emph{profiling}, lalu mengoptimasi tahap demi tahap dan mengukur peningkatan pada setiap langkah.
+    \item Memverifikasi bahwa kedua mode menghasilkan label piksel, \emph{centroid}, dan persentase luas yang identik.
+\end{enumerate}
+
+\section{Hipotesis}
+\label{sec:hipotesisawal}
+Hipotesis berikut adalah target awal dari proposal. Hipotesis ini diuji pada Subbab~\ref{sec:hipotesis}, dan hasilnya bergantung pada perangkat keras yang dipakai.
+\begin{enumerate}
+    \item \emph{Profiling} versi CPU saja menunjukkan bahwa K-Means (\emph{assignment} dan \emph{update}) mengambil porsi waktu terbesar dari keseluruhan proses.
+    \item Pada potongan citra $4096\times4096$ piksel, $K=8$, dan 20 iterasi, komputasi K-Means di GPU (CUDA) minimal $20\times$ lebih cepat daripada versi serial, dan K-Means dengan OpenMP 8 \emph{thread} minimal $4\times$ lebih cepat.
+    \item Pada satu \emph{tile} penuh, waktu \emph{end-to-end} mode optimalisasi minimal $5\times$ lebih cepat daripada mode CPU saja. Angka ini lebih kecil daripada percepatan K-Means saja karena tahap lain, seperti baca citra, tetap memakan waktu (Hukum Amdahl).
+    \item Kedua mode menghasilkan label piksel yang identik 100\%.
+\end{enumerate}
+
+\section{Manfaat}
+\begin{itemize}
+    \item \textbf{Bagi analis lingkungan dan perencana wilayah:} peta awal tutupan lahan beserta persentase dan luas tiap kelas dapat diperoleh dalam waktu singkat, sehingga beberapa nilai $K$ dan beberapa wilayah dapat dicoba sebelum klasifikasi rinci atau survei lapangan.
+    \item \textbf{Bagi pembelajaran:} penerapan alur kerja optimasi HPC yang utuh, yaitu \emph{profiling}, analisis \emph{bottleneck}, optimalisasi dengan CPU dan GPU, dan pembuktian peningkatan kinerja, pada beban kerja \emph{machine learning} dengan data nyata.
+\end{itemize}
+
+\section{Batasan Masalah}
+\label{sec:batasanmasalah}
+\begin{itemize}
+    \item Masukan berupa citra PNG RGB 8-bit per kanal. Citra Sentinel-2 Level-2A disusun dari kanal B04 (merah), B03 (hijau), dan B02 (biru) dengan skala reflektansi $0$--$3000$ menjadi $0$--$255$ (bilangan bulat, dipotong ke rentang itu), bukan dari produk \emph{true color} (TCI). Kanal inframerah dan koreksi geometri tambahan tidak dipakai.
+    \item Piksel di luar jejak citra bernilai $(0,0,0)$ (\emph{nodata}). Piksel ini tetap ikut dikelompokkan oleh K-Means agar beban kerja semua mode sama, tetapi dikecualikan dari perhitungan persentase dan luas.
+    \item Hasil aplikasi adalah \textbf{segmentasi awal tanpa pengawasan, bukan klasifikasi yang akurat}. Proyek ini tidak mengklaim akurasi klasifikasi. Nama kelas ditentukan oleh pengguna, dan objek berwarna mirip (misalnya bayangan dan air) dapat masuk ke kelompok yang sama.
+    \item Luas tiap kelas dihitung dari jumlah piksel dikali luas satu piksel (100~m$^2$ untuk resolusi 10 meter).
+    \item K-Means dijalankan dengan \textbf{jumlah iterasi tetap}, bukan kriteria konvergensi, agar beban kerja kedua mode sama.
+    \item \emph{Centroid} awal dipilih sekali di CPU dengan \emph{seed} tetap, dengan algoritma yang sama untuk semua mode.
+    \item Pengukuran kinerja memakai citra sintetis hingga $7680\times4320$ piksel (sekitar 33 juta piksel). Citra Sentinel-2 asli yang tersedia hanya berupa potongan $512$, $1024$, dan $2048$ piksel persegi dan dipakai untuk uji fungsional aplikasi. Satu \emph{tile} penuh $10980\times10980$ piksel tidak diuji.
+    \item Sistem berjalan pada satu komputer (satu CPU dan satu GPU). Pemrosesan banyak node dengan MPI tidak termasuk ruang lingkup.
+    \item Seluruh program inti dibangun dan diuji di Linux (WSL 2) pada perangkat keras yang tersedia bagi kelompok (lihat Subbab~\ref{sec:lingkungan}).
+\end{itemize}

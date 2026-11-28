@@ -1,0 +1,54 @@
+% bab2.tex - Tinjauan Pustaka (dari proposal Bab II; persamaan II.1-II.4 dari template).
+\chapter{TINJAUAN PUSTAKA}
+
+\section{Tutupan Lahan dan Citra Sentinel-2}
+Tutupan lahan adalah penutup fisik permukaan bumi, misalnya vegetasi, air, bangunan, dan tanah terbuka. Sentinel-2 adalah misi satelit pengamatan bumi dari program Copernicus. Instrumennya merekam kanal biru, hijau, merah, dan inframerah dekat pada resolusi 10 meter. Data dibagikan dalam \emph{tile} berukuran sekitar $100\times100$~km, dan produk Level-2A menyertakan reflektansi permukaan per kanal serta citra warna asli (TCI) hasil gabungan kanal merah, hijau, dan biru dalam format 8-bit \cite{esa2015}. Citra ini dapat diunduh gratis, sehingga cocok sebagai data uji yang realistis. Proyek ini menyusun citra RGB 8-bit sendiri dari kanal reflektansi B04, B03, dan B02 (Subbab~\ref{sec:batasanmasalah}).
+
+\section{Klasifikasi Tanpa Pengawasan dan \emph{Color Quantization}}
+Dalam penginderaan jauh, klasifikasi tanpa pengawasan mengelompokkan piksel berdasarkan kemiripan nilai spektralnya dengan algoritma \emph{clustering} seperti K-Means. Setelah itu analis memberi nama setiap kelompok sesuai jenis tutupan lahannya \cite{richards2022}.
+
+Pada citra RGB, operasi ini sama dengan \emph{color quantization}, yaitu memetakan setiap warna pada gambar ke salah satu dari $K$ warna palet. Metode klasik untuk tugas ini antara lain \emph{median cut} \cite{heckbert1982} yang membagi ruang warna secara rekursif, dan \emph{octree quantization} \cite{gervautz1988} yang menggabungkan warna dalam struktur pohon. K-Means umumnya menghasilkan palet yang lebih baik karena meminimalkan galat kuantisasi secara iteratif \cite{celebi2011}.
+
+\section{Algoritma K-Means}
+\label{sec:kmeans}
+K-Means dalam bentuk algoritma Lloyd \cite{lloyd1982} mengulang dua tahap:
+\begin{enumerate}
+    \item \textbf{Assignment:} setiap piksel $x_i$ diberi label \emph{centroid} terdekat,
+    \begin{equation}
+        c_i = \arg\min_{j} \lVert x_i - \mu_j \rVert^2 .
+        \label{eq:assign}
+    \end{equation}
+    \item \textbf{Update:} setiap \emph{centroid} diganti dengan rata-rata piksel anggotanya,
+    \begin{equation}
+        \mu_j = \frac{1}{|S_j|}\sum_{x_i \in S_j} x_i .
+        \label{eq:update}
+    \end{equation}
+\end{enumerate}
+Kompleksitas per iterasi adalah $O(N \cdot K \cdot D)$, dengan $N$ jumlah piksel, $K$ jumlah \emph{centroid}, dan $D=3$ kanal warna. Implementasi proyek ini menghitung Persamaan~(\ref{eq:update}) dengan pembagian bilangan bulat yang dibulatkan ke bawah (Subbab~\ref{sec:konsistensi}).
+
+Dalam literatur, K-Means biasanya dihentikan saat \emph{centroid} tidak lagi berubah signifikan (konvergen). Proyek ini sengaja memakai jumlah iterasi tetap agar setiap mode mengerjakan pekerjaan yang sama, sehingga perbandingan waktu adil.
+
+\section{Komputasi Paralel}
+\begin{itemize}
+    \item \textbf{OpenMP} \cite{openmp52}: model memori bersama berbasis direktif untuk CPU \emph{multicore}. Konstruksi yang relevan adalah \kode{parallel for}, \kode{reduction}, dan pengaturan \kode{schedule}.
+    \item \textbf{CUDA} \cite{cudaguide}: model pemrograman GPU dengan hierarki \emph{thread}, \emph{block}, dan \emph{grid}. Konsep yang relevan adalah \emph{shared memory}, operasi \emph{atomic}, dan reduksi paralel.
+    \item \textbf{CPU dan GPU bersama}: CPU dan GPU dapat dipakai bersama, dan setiap bagian pekerjaan ditempatkan pada perangkat yang paling sesuai. GPU unggul untuk perhitungan paralel data yang besar, sedangkan CPU unggul untuk pekerjaan bercabang, I/O, dan pekerjaan kecil yang tidak sebanding dengan biaya transfer ke GPU. Dengan CUDA \emph{streams} dan \emph{pinned memory}, transfer data dan komputasi GPU dapat berjalan tumpang tindih dengan pekerjaan CPU \cite{cudaguide}.
+\end{itemize}
+
+\section{Metrik Kinerja}
+\emph{Speedup} dan efisiensi dihitung sebagai
+\begin{equation}
+    S(p) = \frac{T(1)}{T(p)}, \qquad E(p) = \frac{S(p)}{p},
+    \label{eq:speedup}
+\end{equation}
+dengan $T(1)$ waktu versi serial dan $T(p)$ waktu dengan $p$ \emph{thread}. Hukum Amdahl \cite{amdahl1967} memberi batas atas \emph{speedup} untuk ukuran masalah tetap (\emph{strong scaling}):
+\begin{equation}
+    S(p) \le \frac{1}{f + (1-f)/p},
+    \label{eq:amdahl}
+\end{equation}
+dengan $f$ fraksi pekerjaan yang serial. Hukum ini juga menjelaskan mengapa mempercepat satu tahap saja tidak cukup: setelah K-Means dipercepat, tahap lain yang belum dioptimasi menjadi \emph{bottleneck} berikutnya. Hukum Gustafson \cite{gustafson1988} menjadi dasar analisis saat ukuran masalah bertambah seiring jumlah prosesor (\emph{weak scaling}).
+
+\section{Proyek Terkait}
+Penelitian tentang percepatan K-Means umumnya menempuh dua arah. Arah pertama bersifat algoritmik: Celebi \cite{celebi2011} menunjukkan bahwa K-Means dapat dipercepat melalui inisialisasi \emph{centroid} yang lebih baik sehingga jumlah iterasi berkurang, tetapi prosesnya tetap serial. Arah kedua memanfaatkan perangkat keras paralel: Bhimani dkk.\ \cite{bhimani2015} membandingkan implementasi K-Means paralel pada CPU dan GPU.
+
+Proyek ini mengikuti arah kedua dengan tiga penekanan. Pertama, paralelisasi diterapkan pada konteks aplikasi yang jelas, yaitu pemetaan tutupan lahan dari citra satelit beresolusi tinggi. Kedua, CPU dan GPU tidak dipertandingkan, melainkan dipakai bersama: setiap tahap ditempatkan pada perangkat terbaiknya berdasarkan hasil \emph{profiling}. Ketiga, hasil kedua mode dijamin identik melalui aritmetika integer, sehingga selisih waktu yang terukur benar-benar berasal dari optimasi.
